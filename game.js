@@ -19,6 +19,11 @@ function startGame() {
         };
     }
 
+    // Apply learning from previous games (enemies adapt to your style)
+    if (waveManager.applyLearning) {
+        waveManager.applyLearning();
+    }
+
     // Canvas setup
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -70,6 +75,18 @@ function startGame() {
     // Shooting cooldown
     let shootCooldown = 0;
 
+    // ========== PLAYER STATS TRACKING (FOR LEARNING AI) ==========
+    let gameStats = {
+        avgX: 0,
+        avgY: 0,
+        shotsFired: 0,
+        leftMoves: 0,
+        rightMoves: 0,
+        upMoves: 0,
+        downMoves: 0,
+        totalFrames: 0
+    };
+
     // ========== CHEAT MENU TOGGLE (LEFT CLICK) ==========
     canvas.addEventListener('click', (e) => {
         if (e.button === 0) { // left click
@@ -88,8 +105,7 @@ function startGame() {
             e.preventDefault();
             if (window.cheatSystem) {
                 window.cheatSystem.handleCheatKey(e);
-                // If Escape was pressed, cheatSystem will set cheatMenuOpen false via global flag? 
-                // We'll handle Escape separately: close menu
+                // If Escape was pressed, close menu
                 if (e.key === 'Escape') {
                     cheatMenuOpen = false;
                 }
@@ -121,6 +137,10 @@ function startGame() {
     function gameLoop() {
         if (gameOver) {
             document.getElementById('gameOver').style.display = 'block';
+            // Save learning stats on game over
+            if (window.enemyLearning) {
+                window.enemyLearning.updateProfile(gameStats);
+            }
             return;
         }
 
@@ -135,10 +155,24 @@ function startGame() {
     // ========== UPDATE ==========
     function update() {
         // Player movement
-        if (keys['ArrowLeft'] || keys['KeyA']) player.x = Math.max(0, player.x - player.speed);
-        if (keys['ArrowRight'] || keys['KeyD']) player.x = Math.min(1024 - player.width, player.x + player.speed);
-        if (keys['ArrowUp'] || keys['KeyW']) player.y = Math.max(0, player.y - player.speed);
-        if (keys['ArrowDown'] || keys['KeyS']) player.y = Math.min(768 - player.height, player.y + player.speed);
+        const leftPressed = keys['ArrowLeft'] || keys['KeyA'];
+        const rightPressed = keys['ArrowRight'] || keys['KeyD'];
+        const upPressed = keys['ArrowUp'] || keys['KeyW'];
+        const downPressed = keys['ArrowDown'] || keys['KeyS'];
+
+        if (leftPressed) player.x = Math.max(0, player.x - player.speed);
+        if (rightPressed) player.x = Math.min(1024 - player.width, player.x + player.speed);
+        if (upPressed) player.y = Math.max(0, player.y - player.speed);
+        if (downPressed) player.y = Math.min(768 - player.height, player.y + player.speed);
+
+        // Update stats for learning AI
+        gameStats.totalFrames++;
+        gameStats.avgX = (gameStats.avgX * (gameStats.totalFrames - 1) + (player.x / canvas.width)) / gameStats.totalFrames;
+        gameStats.avgY = (gameStats.avgY * (gameStats.totalFrames - 1) + (player.y / canvas.height)) / gameStats.totalFrames;
+        if (leftPressed) gameStats.leftMoves++;
+        if (rightPressed) gameStats.rightMoves++;
+        if (upPressed) gameStats.upMoves++;
+        if (downPressed) gameStats.downMoves++;
 
         // Check active cheats
         const rapidFireActive = window.cheatSystem ? window.cheatSystem.isCheatActive('rapidfire') : false;
@@ -156,7 +190,8 @@ function startGame() {
                 speed: -8
             });
             playSound('laser', 0.5);
-            shootCooldown = rapidFireActive ? 5 : 10; // rapid fire halves cooldown
+            shootCooldown = rapidFireActive ? 5 : 10;
+            gameStats.shotsFired++; // track for learning
         }
         if (shootCooldown > 0) shootCooldown--;
 
@@ -169,8 +204,12 @@ function startGame() {
             if (bullets[i].y + bullets[i].h < 0) bullets.splice(i, 1);
         }
 
-        // Enemy shooting (every 30 frames) – rate increases with wave
-        const enemyShootRate = Math.min(0.5, 0.2 + currentWave * 0.02);
+        // Enemy shooting – rate increases with wave and learning
+        let enemyShootRate = Math.min(0.5, 0.2 + currentWave * 0.02);
+        // If player shoots a lot, enemies shoot more (learning)
+        if (window.enemyLearning && window.enemyLearning.getProfile().shotsPerFrame > 0.05) {
+            enemyShootRate += 0.1;
+        }
         if (frame % 30 === 0) {
             waveManager.enemies.forEach(enemy => {
                 if (Math.random() < enemyShootRate) {
@@ -195,7 +234,6 @@ function startGame() {
                     b.x + b.w > e.x &&
                     b.y < e.y + e.height &&
                     b.y + b.h > e.y) {
-                    // Hit
                     bullets.splice(i, 1);
                     waveManager.enemies.splice(j, 1);
                     score += 10;
@@ -259,10 +297,9 @@ function startGame() {
         // Update wave message timer
         if (waveMessageTimer > 0) waveMessageTimer--;
 
-        // Auto‑aim (basic homing) – if cheat active, redirect bullets toward nearest enemy
+        // Auto‑aim cheat
         if (autoAimActive && waveManager.enemies.length > 0) {
             bullets.forEach(b => {
-                // Find closest enemy
                 let closestDist = Infinity;
                 let closestEnemy = null;
                 waveManager.enemies.forEach(e => {
@@ -275,17 +312,10 @@ function startGame() {
                     }
                 });
                 if (closestEnemy) {
-                    // Gradually steer bullet toward enemy (simple homing)
                     const targetX = closestEnemy.x + closestEnemy.width/2;
                     const targetY = closestEnemy.y + closestEnemy.height/2;
                     const dx = targetX - (b.x + b.w/2);
                     const dy = targetY - (b.y + b.h/2);
-                    const angle = Math.atan2(dy, dx);
-                    // Limit turning speed
-                    const currentAngle = Math.atan2(b.speed, 0); // assuming bullet moves vertically only; we need to store velocity vector.
-                    // Simpler: just set velocity towards target (cheat is strong!)
-                    b.speed = -8; // keep vertical speed, adjust x gradually
-                    const step = 0.2;
                     b.x += Math.sign(dx) * Math.min(Math.abs(dx)*0.1, 2);
                 }
             });
