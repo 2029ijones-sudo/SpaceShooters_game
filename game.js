@@ -28,7 +28,37 @@ function startGame() {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
-    // ========== RESTORED: BACKGROUND VIDEO PLAYBACK ==========
+    // ========== BACKGROUND MUSIC - FIXED ==========
+    function startBackgroundMusic() {
+        if (assets.sounds && assets.sounds.bgm) {
+            // Check if already playing
+            if (!assets.sounds.bgm.playing) {
+                assets.sounds.bgm.loop = true;
+                let vol = localStorage.getItem('spaceShooters_volume');
+                if (vol === null) vol = 70;
+                assets.sounds.bgm.volume = (vol / 100) * 0.5;
+                assets.sounds.bgm.play()
+                    .then(() => { assets.sounds.bgm.playing = true; })
+                    .catch(e => console.log('BGM play failed:', e));
+            }
+        }
+    }
+
+    // Try to start music immediately if possible, otherwise wait for user interaction
+    startBackgroundMusic();
+    
+    // Also try on any user interaction (click, keydown, touch)
+    const userInteraction = () => {
+        startBackgroundMusic();
+        document.removeEventListener('click', userInteraction);
+        document.removeEventListener('keydown', userInteraction);
+        document.removeEventListener('touchstart', userInteraction);
+    };
+    document.addEventListener('click', userInteraction);
+    document.addEventListener('keydown', userInteraction);
+    document.addEventListener('touchstart', userInteraction);
+
+    // Play background video if available
     if (assets.videos && assets.videos.nebula) {
         assets.videos.nebula.play().catch(e => {
             console.log('Background video autoplay failed:', e);
@@ -42,20 +72,10 @@ function startGame() {
         });
     }
 
-    // ========== OPEN WORLD PARAMETERS ==========
-    const WORLD_SIZE = 100000;                     // virtual universe size (pixels)
-    let worldX = 512;                               // player's absolute X in world
-    let worldY = 650;                               // player's absolute Y in world
-    const SECTOR_SIZE = 1024;                       // size of one sector (matches canvas)
-    let currentSector = { x: 0, y: 0 };
-    let loadedSectors = new Set();                  // track loaded sectors to avoid reloading
-    let sectorEnemies = new Map();                   // key "x,y" -> array of enemies (world coordinates)
-
-    // Camera: top‑left corner of viewport in world coordinates
-    let camera = { x: 0, y: 0 };
-
     // ========== GAME STATE ==========
     let player = {
+        x: 512 - 25,
+        y: 650,
         width: 50,
         height: 50,
         speed: 5,
@@ -65,7 +85,6 @@ function startGame() {
 
     let bullets = [];
     let enemyBullets = [];
-    let healthPickups = [];
     let score = 0;
     let gameOver = false;
     let frame = 0;
@@ -73,10 +92,10 @@ function startGame() {
     // Kill count for bullet progression (unlimited)
     let killCount = 0;
 
-    // Wave tracking – now global (difficulty increases over time)
-    let currentWave = 0;
-    let waveMessage = '';
-    let waveMessageTimer = 0;
+    // Level tracking - classic arcade progression
+    let currentLevel = 1;
+    let levelMessage = '';
+    let levelMessageTimer = 0;
 
     // Cheat system integration
     let cheatMenuOpen = false;
@@ -143,67 +162,34 @@ function startGame() {
             case 'extralife':
                 player.lives++;
                 document.getElementById('lives').textContent = player.lives;
-                waveMessage = 'EXTRA LIFE!';
-                waveMessageTimer = 60;
+                levelMessage = 'EXTRA LIFE!';
+                levelMessageTimer = 60;
                 break;
         }
     };
 
-    // Start first wave
+    // Start first level
+    waveManager.waveCount = currentLevel; // Sync waveManager with our level
     waveManager.startWave();
-    currentWave = waveManager.waveCount;
-    if (window.cheatSystem) window.cheatSystem.updateUnlocks(currentWave);
-    waveMessage = `WAVE ${currentWave}`;
-    waveMessageTimer = 60;
+    if (window.cheatSystem) window.cheatSystem.updateUnlocks(currentLevel);
+    levelMessage = `LEVEL ${currentLevel}`;
+    levelMessageTimer = 60;
 
-    // ========== SECTOR MANAGEMENT ==========
-    function getSectorKey(wx, wy) {
-        return `${Math.floor(wx / SECTOR_SIZE)},${Math.floor(wy / SECTOR_SIZE)}`;
-    }
-
-    function generateSector(sx, sy) {
-        const key = `${sx},${sy}`;
-        if (sectorEnemies.has(key)) return; // already generated
-
-        const enemies = [];
-        // Procedurally generate enemies based on sector coordinates and wave
-        const enemyCount = 3 + Math.floor(Math.random() * 5) + waveManager.waveCount;
-        for (let i = 0; i < enemyCount; i++) {
-            const x = sx * SECTOR_SIZE + Math.random() * SECTOR_SIZE;
-            const y = sy * SECTOR_SIZE + Math.random() * SECTOR_SIZE;
-            const type = Math.random() < 0.7 ? 'enemy1' : 'enemy2';
-            // Create enemy using waveManager's learning profile
-            const enemy = new Enemy(x, y, type, waveManager.learningProfile);
-            enemy.pattern = waveManager.waveCount % 2 === 0 ? 'down' : 'sine';
-            enemies.push(enemy);
+    // ========== GAME LOOP ==========
+    function gameLoop() {
+        if (gameOver) {
+            document.getElementById('gameOver').style.display = 'block';
+            if (window.enemyLearning) window.enemyLearning.updateProfile(gameStats);
+            if (window.network) window.network.disconnect();
+            return;
         }
-        sectorEnemies.set(key, enemies);
-        loadedSectors.add(key);
-        console.log(`Generated sector ${key} with ${enemies.length} enemies`);
-    }
 
-    function updateSector() {
-        const sx = Math.floor(worldX / SECTOR_SIZE);
-        const sy = Math.floor(worldY / SECTOR_SIZE);
-        if (currentSector.x !== sx || currentSector.y !== sy) {
-            currentSector = { x: sx, y: sy };
-            // Generate current and adjacent sectors (9 sectors)
-            for (let dx = -1; dx <= 1; dx++) {
-                for (let dy = -1; dy <= 1; dy++) {
-                    generateSector(sx + dx, sy + dy);
-                }
-            }
-            // Optional: unload far sectors to save memory
+        if (!cheatMenuOpen) {
+            update();
         }
-    }
+        draw();
 
-    // Get all enemies that are in loaded sectors (near player)
-    function getNearbyEnemies() {
-        const nearby = [];
-        for (let enemies of sectorEnemies.values()) {
-            nearby.push(...enemies);
-        }
-        return nearby;
+        requestAnimationFrame(gameLoop);
     }
 
     // ========== HELPER: Generate bullets based on kill count ==========
@@ -251,51 +237,25 @@ function startGame() {
         return bulletsArray;
     }
 
-    // ========== GAME LOOP ==========
-    function gameLoop() {
-        if (gameOver) {
-            document.getElementById('gameOver').style.display = 'block';
-            if (window.enemyLearning) window.enemyLearning.updateProfile(gameStats);
-            if (window.network) window.network.disconnect();
-            return;
-        }
-
-        if (!cheatMenuOpen) {
-            update();
-        }
-        draw();
-
-        requestAnimationFrame(gameLoop);
-    }
-
     // ========== UPDATE ==========
     function update() {
         if (window.enemyLearning) window.enemyLearning.setGlobalFrame(frame);
 
-        // Player movement (world coordinates)
+        // Player movement
         const leftPressed = keys['ArrowLeft'] || keys['KeyA'];
         const rightPressed = keys['ArrowRight'] || keys['KeyD'];
         const upPressed = keys['ArrowUp'] || keys['KeyW'];
         const downPressed = keys['ArrowDown'] || keys['KeyS'];
 
-        if (leftPressed) worldX = Math.max(0, worldX - player.speed);
-        if (rightPressed) worldX = Math.min(WORLD_SIZE - player.width, worldX + player.speed);
-        if (upPressed) worldY = Math.max(0, worldY - player.speed);
-        if (downPressed) worldY = Math.min(WORLD_SIZE - player.height, worldY + player.speed);
-
-        // Update camera to center on player
-        camera.x = worldX - canvas.width / 2;
-        camera.y = worldY - canvas.height / 2;
-        camera.x = Math.max(0, Math.min(camera.x, WORLD_SIZE - canvas.width));
-        camera.y = Math.max(0, Math.min(camera.y, WORLD_SIZE - canvas.height));
-
-        // Update sector based on new position
-        updateSector();
+        if (leftPressed) player.x = Math.max(0, player.x - player.speed);
+        if (rightPressed) player.x = Math.min(1024 - player.width, player.x + player.speed);
+        if (upPressed) player.y = Math.max(0, player.y - player.speed);
+        if (downPressed) player.y = Math.min(768 - player.height, player.y + player.speed);
 
         // Update stats for cross‑game learning
         gameStats.totalFrames++;
-        gameStats.avgX = (gameStats.avgX * (gameStats.totalFrames - 1) + (worldX / WORLD_SIZE)) / gameStats.totalFrames;
-        gameStats.avgY = (gameStats.avgY * (gameStats.totalFrames - 1) + (worldY / WORLD_SIZE)) / gameStats.totalFrames;
+        gameStats.avgX = (gameStats.avgX * (gameStats.totalFrames - 1) + (player.x / canvas.width)) / gameStats.totalFrames;
+        gameStats.avgY = (gameStats.avgY * (gameStats.totalFrames - 1) + (player.y / canvas.height)) / gameStats.totalFrames;
         if (leftPressed) gameStats.leftMoves++;
         if (rightPressed) gameStats.rightMoves++;
         if (upPressed) gameStats.upMoves++;
@@ -310,7 +270,7 @@ function startGame() {
         // Shooting
         const shotThisFrame = keys['Space'] && shootCooldown <= 0;
         if (shotThisFrame) {
-            const newBullets = createBullets(worldX, worldY, player.width, -8, rapidFireActive);
+            const newBullets = createBullets(player.x, player.y, player.width, -8, rapidFireActive);
             bullets.push(...newBullets);
             playSound('laser', 0.5);
             shootCooldown = rapidFireActive ? 5 : 10;
@@ -320,16 +280,13 @@ function startGame() {
 
         // Real‑time learning
         if (window.liveLearning) {
-            window.liveLearning.update(worldX, worldY, shotThisFrame);
+            window.liveLearning.update(player.x, player.y, shotThisFrame);
         }
 
-        // Get all enemies near player (from loaded sectors)
-        const allEnemies = getNearbyEnemies();
+        // Update wave manager (enemies)
+        waveManager.update();
 
-        // Update enemies
-        allEnemies.forEach(e => e.update(worldX, worldY));
-
-        // Update player bullets (world coordinates)
+        // Update player bullets
         for (let i = bullets.length - 1; i >= 0; i--) {
             const b = bullets[i];
             if (b.speedX !== undefined) {
@@ -338,18 +295,18 @@ function startGame() {
             } else {
                 b.y += b.speed;
             }
-            if (b.y + b.h < 0 || b.y > WORLD_SIZE || b.x + b.w < 0 || b.x > WORLD_SIZE) {
+            if (b.y + b.h < 0 || b.y > canvas.height) {
                 bullets.splice(i, 1);
             }
         }
 
-        // Enemy shooting
-        let enemyShootRate = Math.min(0.5, 0.2 + currentWave * 0.02);
+        // Enemy shooting – rate increases with level
+        let enemyShootRate = Math.min(0.5, 0.2 + currentLevel * 0.03);
         if (window.enemyLearning && window.enemyLearning.getProfile().shotsPerFrame > 0.05) {
             enemyShootRate += 0.1;
         }
         if (frame % 30 === 0) {
-            allEnemies.forEach(enemy => {
+            waveManager.enemies.forEach(enemy => {
                 if (Math.random() < enemyShootRate) {
                     const eb = enemy.shoot();
                     enemyBullets.push(eb);
@@ -360,55 +317,25 @@ function startGame() {
         // Update enemy bullets
         for (let i = enemyBullets.length - 1; i >= 0; i--) {
             enemyBullets[i].y += enemyBullets[i].speed;
-            if (enemyBullets[i].y > WORLD_SIZE) enemyBullets.splice(i, 1);
+            if (enemyBullets[i].y > 768) enemyBullets.splice(i, 1);
         }
 
         // Collisions: player bullets vs enemies
         for (let i = bullets.length - 1; i >= 0; i--) {
             const b = bullets[i];
-            for (let j = allEnemies.length - 1; j >= 0; j--) {
-                const e = allEnemies[j];
+            for (let j = waveManager.enemies.length - 1; j >= 0; j--) {
+                const e = waveManager.enemies[j];
                 if (b.x < e.x + e.width &&
                     b.x + b.w > e.x &&
                     b.y < e.y + e.height &&
                     b.y + b.h > e.y) {
                     bullets.splice(i, 1);
-                    const key = getSectorKey(e.x, e.y);
-                    const sectorList = sectorEnemies.get(key);
-                    if (sectorList) {
-                        const idx = sectorList.indexOf(e);
-                        if (idx !== -1) sectorList.splice(idx, 1);
-                    }
+                    waveManager.enemies.splice(j, 1);
                     score += 10;
                     killCount++;
                     playSound('explode', 0.7);
-
-                    healthPickups.push({
-                        x: e.x + e.width/2 - 10,
-                        y: e.y,
-                        w: 20,
-                        h: 20,
-                        speed: 2
-                    });
                     break;
                 }
-            }
-        }
-
-        // Health pickups update and collection
-        for (let i = healthPickups.length - 1; i >= 0; i--) {
-            const h = healthPickups[i];
-            h.y += h.speed;
-            if (h.y > WORLD_SIZE) {
-                healthPickups.splice(i, 1);
-                continue;
-            }
-            if (h.x < worldX + player.width && h.x + h.w > worldX &&
-                h.y < worldY + player.height && h.y + h.h > worldY) {
-                player.lives++;
-                document.getElementById('lives').textContent = player.lives;
-                healthPickups.splice(i, 1);
-                playSound('explode', 0.5);
             }
         }
 
@@ -416,8 +343,8 @@ function startGame() {
         if (player.invincible <= 0 && !invincibleActive) {
             for (let i = enemyBullets.length - 1; i >= 0; i--) {
                 const eb = enemyBullets[i];
-                if (eb.x < worldX + player.width && eb.x + eb.w > worldX &&
-                    eb.y < worldY + player.height && eb.y + eb.h > worldY) {
+                if (eb.x < player.x + player.width && eb.x + eb.w > player.x &&
+                    eb.y < player.y + player.height && eb.y + eb.h > player.y) {
                     enemyBullets.splice(i, 1);
                     player.lives--;
                     player.invincible = 60;
@@ -432,16 +359,11 @@ function startGame() {
 
         // Enemies vs player
         if (player.invincible <= 0 && !invincibleActive) {
-            for (let i = allEnemies.length - 1; i >= 0; i--) {
-                const e = allEnemies[i];
-                if (e.x < worldX + player.width && e.x + e.width > worldX &&
-                    e.y < worldY + player.height && e.y + e.height > worldY) {
-                    const key = getSectorKey(e.x, e.y);
-                    const sectorList = sectorEnemies.get(key);
-                    if (sectorList) {
-                        const idx = sectorList.indexOf(e);
-                        if (idx !== -1) sectorList.splice(idx, 1);
-                    }
+            for (let i = waveManager.enemies.length - 1; i >= 0; i--) {
+                const e = waveManager.enemies[i];
+                if (e.x < player.x + player.width && e.x + e.width > player.x &&
+                    e.y < player.y + player.height && e.y + e.height > player.y) {
+                    waveManager.enemies.splice(i, 1);
                     player.lives--;
                     player.invincible = 60;
                     playSound('explode', 1);
@@ -454,17 +376,12 @@ function startGame() {
         // Multiplayer sync
         if (multiplayerActive && window.network) {
             window.network.sendPlayerState({
-                x: worldX, y: worldY,
+                x: player.x, y: player.y,
                 width: player.width, height: player.height,
                 lives: player.lives
             });
             if (isHost && window.network.sendEnemyState) {
-                const nearbyEnemies = allEnemies.filter(e => {
-                    const dx = e.x - worldX;
-                    const dy = e.y - worldY;
-                    return Math.abs(dx) < 2000 && Math.abs(dy) < 2000;
-                }).map(e => ({ x: e.x, y: e.y, type: e.type }));
-                window.network.sendEnemyState(nearbyEnemies);
+                window.network.sendEnemyState(waveManager.getSerializedEnemies());
             }
         }
 
@@ -472,22 +389,27 @@ function startGame() {
         document.getElementById('lives').textContent = player.lives;
         document.getElementById('score').textContent = score;
 
-        // Wave progression
-        if (killCount > currentWave * 10) {
+        // Level progression - classic style, each wave is a level
+        if (waveManager.enemies.length === 0 && waveManager.spawnTimer <= 0) {
+            currentLevel++;
+            waveManager.waveCount = currentLevel; // Update waveManager
             waveManager.startWave();
-            currentWave = waveManager.waveCount;
-            if (window.cheatSystem) window.cheatSystem.updateUnlocks(currentWave);
-            waveMessage = `WAVE ${currentWave}`;
-            waveMessageTimer = 60;
+            if (window.cheatSystem) window.cheatSystem.updateUnlocks(currentLevel);
+            levelMessage = `LEVEL ${currentLevel}`;
+            levelMessageTimer = 60;
+            
+            // Level up effect - maybe speed increases
+            player.speed = Math.min(8, 5 + currentLevel * 0.2);
         }
-        if (waveMessageTimer > 0) waveMessageTimer--;
+
+        if (levelMessageTimer > 0) levelMessageTimer--;
 
         // Auto‑aim cheat
-        if (autoAimActive && allEnemies.length > 0) {
+        if (autoAimActive && waveManager.enemies.length > 0) {
             bullets.forEach(b => {
                 let closestDist = Infinity;
                 let closestEnemy = null;
-                allEnemies.forEach(e => {
+                waveManager.enemies.forEach(e => {
                     const dx = (e.x + e.width/2) - (b.x + b.w/2);
                     const dy = (e.y + e.height/2) - (b.y + b.h/2);
                     const dist = Math.sqrt(dx*dx + dy*dy);
@@ -523,123 +445,84 @@ function startGame() {
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Draw background video
+        // Draw background (video or starfield)
         if (assets.videos && assets.videos.nebula && assets.videos.nebula.readyState >= 2) {
             ctx.drawImage(assets.videos.nebula, 0, 0, canvas.width, canvas.height);
         } else {
-            // Starfield fallback
             ctx.fillStyle = 'white';
             for (let i = 0; i < 100; i++) {
-                let sx = (i * 73 + frame) % canvas.width;
+                let sx = (i * 73) % canvas.width;
                 let sy = (frame * 0.5 + i * 23) % canvas.height;
                 ctx.fillRect(sx, sy, 2, 2);
             }
         }
 
-        // Wave message
-        if (waveMessageTimer > 0) {
+        // Draw level message
+        if (levelMessageTimer > 0) {
             ctx.font = '40px "Press Start 2P", monospace';
             ctx.fillStyle = '#ffd966';
             ctx.textAlign = 'center';
-            ctx.fillText(waveMessage, canvas.width/2, 300);
+            ctx.fillText(levelMessage, canvas.width/2, 300);
         }
 
         // Draw player
-        const playerScreenX = worldX - camera.x;
-        const playerScreenY = worldY - camera.y;
         if (player.invincible <= 0 || Math.floor(frame / 5) % 2 === 0) {
-            if (assets.useVideo('playerVideo')) {
-                ctx.drawImage(assets.videos.playerVideo, playerScreenX, playerScreenY, player.width, player.height);
-            } else if (assets.images && assets.images.player) {
-                ctx.drawImage(assets.images.player, playerScreenX, playerScreenY, player.width, player.height);
+            if (assets.images && assets.images.player) {
+                ctx.drawImage(assets.images.player, player.x, player.y, player.width, player.height);
             } else {
                 ctx.fillStyle = 'cyan';
-                ctx.fillRect(playerScreenX, playerScreenY, player.width, player.height);
+                ctx.fillRect(player.x, player.y, player.width, player.height);
             }
         }
 
         // Draw enemies
-        const allEnemies = getNearbyEnemies();
-        allEnemies.forEach(e => {
-            const ex = e.x - camera.x;
-            const ey = e.y - camera.y;
-            if (ex + e.width > 0 && ex < canvas.width && ey + e.height > 0 && ey < canvas.height) {
-                if (assets.useVideo('enemyVideo')) {
-                    ctx.drawImage(assets.videos.enemyVideo, ex, ey, e.width, e.height);
-                } else if (assets.images && assets.images[e.type]) {
-                    ctx.drawImage(assets.images[e.type], ex, ey, e.width, e.height);
-                } else {
-                    ctx.fillStyle = 'red';
-                    ctx.fillRect(ex, ey, e.width, e.height);
-                }
+        waveManager.enemies.forEach(e => {
+            if (assets.images && assets.images[e.type]) {
+                ctx.drawImage(assets.images[e.type], e.x, e.y, e.width, e.height);
+            } else {
+                ctx.fillStyle = 'red';
+                ctx.fillRect(e.x, e.y, e.width, e.height);
             }
         });
 
         // Draw remote player
         if (multiplayerActive && remotePlayer) {
-            const rx = remotePlayer.x - camera.x;
-            const ry = remotePlayer.y - camera.y;
-            if (rx + 50 > 0 && rx < canvas.width && ry + 50 > 0 && ry < canvas.height) {
-                if (assets.useVideo('playerVideo')) {
-                    ctx.globalAlpha = 0.7;
-                    ctx.drawImage(assets.videos.playerVideo, rx, ry, remotePlayer.width || 50, remotePlayer.height || 50);
-                    ctx.globalAlpha = 1.0;
-                } else {
-                    ctx.fillStyle = 'purple';
-                    ctx.fillRect(rx, ry, remotePlayer.width || 50, remotePlayer.height || 50);
-                }
+            if (assets.images && assets.images.player) {
+                ctx.globalAlpha = 0.7;
+                ctx.drawImage(assets.images.player, remotePlayer.x, remotePlayer.y, remotePlayer.width || 50, remotePlayer.height || 50);
+                ctx.globalAlpha = 1.0;
+            } else {
+                ctx.fillStyle = 'purple';
+                ctx.fillRect(remotePlayer.x, remotePlayer.y, remotePlayer.width || 50, remotePlayer.height || 50);
             }
         }
 
-        // Draw health pickups
-        healthPickups.forEach(h => {
-            const hx = h.x - camera.x;
-            const hy = h.y - camera.y;
-            if (hx + h.w > 0 && hx < canvas.width && hy + h.h > 0 && hy < canvas.height) {
-                ctx.fillStyle = '#0f0';
-                ctx.beginPath();
-                ctx.arc(hx + h.w/2, hy + h.h/2, h.w/2, 0, Math.PI*2);
-                ctx.fill();
-                ctx.fillStyle = 'white';
-                ctx.fillRect(hx + h.w/2 - 2, hy + 4, 4, h.h-8);
-                ctx.fillRect(hx + 4, hy + h.h/2 - 2, h.w-8, 4);
-            }
-        });
-
         // Draw player bullets
         bullets.forEach(b => {
-            const bx = b.x - camera.x;
-            const by = b.y - camera.y;
-            if (bx + b.w > 0 && bx < canvas.width && by + b.h > 0 && by < canvas.height) {
-                if (assets.images && assets.images.bullet) {
-                    ctx.drawImage(assets.images.bullet, bx, by, b.w, b.h);
-                } else {
-                    ctx.fillStyle = 'yellow';
-                    ctx.fillRect(bx, by, b.w, b.h);
-                }
+            if (assets.images && assets.images.bullet) {
+                ctx.drawImage(assets.images.bullet, b.x, b.y, b.w, b.h);
+            } else {
+                ctx.fillStyle = 'yellow';
+                ctx.fillRect(b.x, b.y, b.w, b.h);
             }
         });
 
         // Draw enemy bullets
         enemyBullets.forEach(b => {
-            const bx = b.x - camera.x;
-            const by = b.y - camera.y;
-            if (bx + b.w > 0 && bx < canvas.width && by + b.h > 0 && by < canvas.height) {
-                if (assets.images && assets.images.enemyBullet) {
-                    ctx.drawImage(assets.images.enemyBullet, bx, by, b.w, b.h);
-                } else {
-                    ctx.fillStyle = 'orange';
-                    ctx.fillRect(bx, by, b.w, b.h);
-                }
+            if (assets.images && assets.images.enemyBullet) {
+                ctx.drawImage(assets.images.enemyBullet, b.x, b.y, b.w, b.h);
+            } else {
+                ctx.fillStyle = 'orange';
+                ctx.fillRect(b.x, b.y, b.w, b.h);
             }
         });
 
-        // Cheat menu
+        // Draw cheat menu
         if (cheatMenuOpen && window.cheatSystem) {
             window.cheatSystem.drawCheatMenu(ctx, canvas.width, canvas.height);
         }
 
-        // Multiplayer status
+        // Draw multiplayer status
         if (multiplayerActive) {
             ctx.font = '16px "Press Start 2P", monospace';
             ctx.fillStyle = '#0ff';
@@ -647,25 +530,19 @@ function startGame() {
             ctx.fillText('MULTIPLAYER', canvas.width - 20, 40);
         }
 
-        // Kill count
+        // Draw kill count
         ctx.font = '16px "Press Start 2P", monospace';
         ctx.fillStyle = '#ff0';
         ctx.textAlign = 'left';
         ctx.fillText(`KILLS: ${killCount}`, 20, 100);
+        
+        // Draw current level
+        ctx.font = '16px "Press Start 2P", monospace';
+        ctx.fillStyle = '#0ff';
+        ctx.textAlign = 'right';
+        ctx.fillText(`LEVEL: ${currentLevel}`, canvas.width - 20, 100);
     }
 
     // Start game loop
     gameLoop();
-
-    // Background music – plays after first user click/tap
-    document.addEventListener('click', function playBGM() {
-        if (assets.sounds && assets.sounds.bgm) {
-            assets.sounds.bgm.loop = true;
-            let vol = localStorage.getItem('spaceShooters_volume');
-            if (vol === null) vol = 70;
-            assets.sounds.bgm.volume = (vol / 100) * 0.5;
-            assets.sounds.bgm.play().catch(e => console.log('BGM play failed:', e));
-        }
-        document.removeEventListener('click', playBGM);
-    }, { once: true });
 }
