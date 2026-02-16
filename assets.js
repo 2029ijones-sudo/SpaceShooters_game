@@ -21,12 +21,12 @@ const assetManifest = {
         { name: 'starfield', src: 'images/starfield.png' } // optional
     ],
     sounds: [
-        { name: 'laser', src: 'sounds/laser.mp3' },
-        { name: 'explode', src: 'sounds/explode.mp3' },
-        { name: 'bgm', src: 'sounds/bgm.mp3' }
+        { name: 'laser', src: 'sounds/Laser 3.mp3' },
+        { name: 'explode', src: 'sounds/dragon-studio-loud-explosion-425457.mp3' },
+        { name: 'bgm', src: 'sounds/universfield-horror-background-atmosphere-156462.mp3' }
     ],
     videos: [
-        { name: 'nebula', src: 'videos/nebula.mp4' } // optional background
+        { name: 'nebula', src: 'videos/139106-771366016_small.mp4' } // optional background
     ]
 };
 
