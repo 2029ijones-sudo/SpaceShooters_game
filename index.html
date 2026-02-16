@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SpaceShooters – Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        #gameCanvas {
+            display: block;
+            width: 1024px;
+            height: 768px;
+            border: 2px solid #3a6ea5;
+            box-shadow: 0 0 30px #3a6ea5;
+            background: #03050f;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: monospace;
+            font-size: 24px;
+            text-shadow: 0 0 5px cyan;
+            z-index: 10;
+        }
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: red;
+            font-size: 48px;
+            padding: 2rem 4rem;
+            border-radius: 2rem;
+            border: 2px solid red;
+            display: none;
+            z-index: 20;
+            text-align: center;
+        }
+        #gameOver button {
+            margin-top: 20px;
+            font-size: 24px;
+            padding: 0.5rem 2rem;
+            background: #1e2a47;
+            color: white;
+            border: 2px solid cyan;
+            border-radius: 2rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <span>❤️ <span id="lives">3</span></span>
+        <span style="margin-left: 30px;">🔫 <span id="score">0</span></span>
+    </div>
+    <canvas id="gameCanvas" width="1024" height="768"></canvas>
+    <div id="gameOver">
+        GAME OVER<br>
+        <button onclick="location.reload()">PLAY AGAIN</button>
+        <button onclick="window.location.href='menu.html'">MENU</button>
+    </div>
+
+    <!-- Scripts in correct order -->
+    <script src="assets.js"></script>
+    <script src="enemies.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
