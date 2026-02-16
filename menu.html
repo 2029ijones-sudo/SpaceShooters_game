@@ -170,6 +170,13 @@
             display: inline-block;
             letter-spacing: 2px;
             position: relative;
+            opacity: 0.5;  /* dimmed until credit inserted */
+            pointer-events: none; /* not clickable without credit */
+        }
+
+        .arcade-btn.active {
+            opacity: 1;
+            pointer-events: auto;
         }
 
         .arcade-btn:active {
@@ -195,18 +202,36 @@
             50% { opacity: 0.3; }
         }
 
-        /* insert coin blinking */
+        /* insert coin – now clickable! */
         .coin {
             font-size: 22px;
             color: #6f6;
             text-shadow: 0 0 15px #0f0;
             margin: 30px 0 20px;
             animation: coinBlink 1.2s infinite;
+            cursor: pointer;
+            display: inline-block;
+            padding: 10px 20px;
+            border: 2px solid #0f0;
+            border-radius: 40px;
+            background: rgba(0,0,0,0.3);
+        }
+        .coin:hover {
+            background: #0f0;
+            color: black;
+            text-shadow: none;
         }
 
         @keyframes coinBlink {
             0%, 50% { opacity: 1; }
             51%, 100% { opacity: 0.3; }
+        }
+
+        /* credit display */
+        .credits {
+            font-size: 18px;
+            color: #ffb347;
+            margin-top: 10px;
         }
 
         /* small instruction label */
@@ -274,10 +299,11 @@
             border-radius: 50%;
             background: #f44;
             box-shadow: 0 0 15px red;
+            transition: 0.2s;
         }
-
         .led.green { background: #4f4; box-shadow: 0 0 15px #0f0; }
         .led.yellow { background: #ff4; box-shadow: 0 0 15px #ff0; }
+        .led.off { background: #300; box-shadow: none; }
     </style>
 </head>
 <body>
@@ -288,15 +314,18 @@
                 <!-- main title -->
                 <h1>⍟ SPACE SHOOTERS ⍟</h1>
 
+                <!-- credit display -->
+                <div class="credits" id="creditDisplay">CREDITS: 0</div>
+
                 <!-- menu options as buttons (links) -->
                 <div class="menu-buttons">
-                    <a href="index.html" class="arcade-btn" style="text-decoration: none;">1 PLAYER START</a>
-                    <a href="options.html" class="arcade-btn" style="text-decoration: none;">OPTIONS</a>
-                    <a href="#" id="helpBtn" class="arcade-btn" style="text-decoration: none;">HELP</a>
+                    <a href="index.html" id="startBtn" class="arcade-btn" style="text-decoration: none;">1 PLAYER START</a>
+                    <a href="options.html" class="arcade-btn active" style="text-decoration: none;">OPTIONS</a>
+                    <a href="#" id="helpBtn" class="arcade-btn active" style="text-decoration: none;">HELP</a>
                 </div>
 
-                <!-- blinking coin text -->
-                <div class="coin">⏣ INSERT COIN ⏣</div>
+                <!-- blinking coin text – now clickable -->
+                <div class="coin" id="coinSlot">⏣ INSERT COIN ⏣</div>
 
                 <!-- simple instructions (always visible) -->
                 <div class="instructions">
@@ -314,12 +343,12 @@
                     <button class="close-help" id="closeHelp">CLOSE</button>
                 </div>
 
-                <!-- fake leds (just for looks) -->
+                <!-- fake leds – now they react to credits -->
                 <div class="control-panel">
-                    <div class="led"></div>
-                    <div class="led green"></div>
-                    <div class="led yellow"></div>
-                    <div class="led"></div>
+                    <div class="led" id="led1"></div>
+                    <div class="led" id="led2"></div>
+                    <div class="led" id="led3"></div>
+                    <div class="led" id="led4"></div>
                 </div>
 
                 <!-- tiny version number -->
@@ -328,14 +357,78 @@
         </div>
     </div>
 
-    <!-- simple script for help panel toggle -->
     <script>
         (function() {
+            // Arcade credit system
+            let credits = 0;
+            const creditDisplay = document.getElementById('creditDisplay');
+            const coinSlot = document.getElementById('coinSlot');
+            const startBtn = document.getElementById('startBtn');
+            const leds = [
+                document.getElementById('led1'),
+                document.getElementById('led2'),
+                document.getElementById('led3'),
+                document.getElementById('led4')
+            ];
+
+            // Update LEDs based on credits (max 4)
+            function updateLeds() {
+                for (let i = 0; i < leds.length; i++) {
+                    if (i < credits) {
+                        leds[i].className = 'led green'; // first credits green
+                    } else {
+                        leds[i].className = 'led off';
+                    }
+                }
+            }
+
+            // Update UI and start button state
+            function updateCredits() {
+                creditDisplay.textContent = `CREDITS: ${credits}`;
+                if (credits > 0) {
+                    startBtn.classList.add('active');
+                } else {
+                    startBtn.classList.remove('active');
+                }
+                updateLeds();
+            }
+
+            // Insert coin (click on coin slot)
+            coinSlot.addEventListener('click', (e) => {
+                e.preventDefault();
+                credits++;
+                updateCredits();
+                // Optional: play a coin sound (simple beep)
+                try {
+                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    oscillator.frequency.value = 800;
+                    gainNode.gain.value = 0.1;
+                    oscillator.start();
+                    oscillator.stop(audioCtx.currentTime + 0.1);
+                } catch (e) { /* no audio */ }
+            });
+
+            // When start button is clicked, spend one credit
+            startBtn.addEventListener('click', (e) => {
+                if (credits <= 0) {
+                    e.preventDefault(); // shouldn't happen due to class, but safety
+                    return;
+                }
+                credits--;
+                updateCredits();
+                // Allow navigation to game
+                // No e.preventDefault() so link works
+            });
+
+            // Help panel toggle
             const helpBtn = document.getElementById('helpBtn');
             const helpPanel = document.getElementById('helpPanel');
             const closeBtn = document.getElementById('closeHelp');
 
-            // prevent default anchor click and show panel
             helpBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 helpPanel.classList.add('show');
@@ -345,7 +438,8 @@
                 helpPanel.classList.remove('show');
             });
 
-            // optional: click outside to close? not necessary but can be added
+            // Initialize (0 credits)
+            updateCredits();
         })();
     </script>
 </body>
