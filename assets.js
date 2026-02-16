@@ -16,7 +16,7 @@ const assetManifest = {
         { name: 'enemy1', src: 'images/enemy1.png' },
         { name: 'enemy2', src: 'images/enemy2.png' },
         { name: 'bullet', src: 'images/bullet.png' },
-        { name: 'enemyBullet', src: 'images/enemy_bullet.png' },
+        { name: 'enemyBullet', src: 'images/bullet.png' },
         { name: 'explosion', src: 'images/explosion.png' },
         { name: 'starfield', src: 'images/starfield.png' } // optional
     ],
