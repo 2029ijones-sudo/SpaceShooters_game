@@ -75,7 +75,7 @@ function startGame() {
     // Shooting cooldown
     let shootCooldown = 0;
 
-    // ========== PLAYER STATS TRACKING (FOR LEARNING AI) ==========
+    // ========== PLAYER STATS TRACKING (FOR CROSS‑GAME LEARNING) ==========
     let gameStats = {
         avgX: 0,
         avgY: 0,
@@ -86,6 +86,28 @@ function startGame() {
         downMoves: 0,
         totalFrames: 0
     };
+
+    // ========== MULTIPLAYER (LAN) ==========
+    let multiplayerActive = false;          // set true when connected
+    let remotePlayer = null;                // { x, y, width, height } from network
+    let isHost = false;                     // determined by network init
+
+    // If network.js is loaded, it will provide these callbacks
+    if (window.network) {
+        // Called when a remote player joins or sends update
+        window.network.onRemoteUpdate = (data) => {
+            remotePlayer = data;
+            // Also pass to enemies.js multiplayer hook
+            if (window.multiplayer) {
+                window.multiplayer.updateRemotePlayer(data);
+            }
+        };
+        window.network.onDisconnect = () => {
+            multiplayerActive = false;
+            remotePlayer = null;
+            console.log('Remote player disconnected');
+        };
+    }
 
     // ========== CHEAT MENU TOGGLE (LEFT CLICK) ==========
     canvas.addEventListener('click', (e) => {
@@ -105,7 +127,6 @@ function startGame() {
             e.preventDefault();
             if (window.cheatSystem) {
                 window.cheatSystem.handleCheatKey(e);
-                // If Escape was pressed, close menu
                 if (e.key === 'Escape') {
                     cheatMenuOpen = false;
                 }
@@ -141,6 +162,8 @@ function startGame() {
             if (window.enemyLearning) {
                 window.enemyLearning.updateProfile(gameStats);
             }
+            // Disconnect from multiplayer
+            if (window.network) window.network.disconnect();
             return;
         }
 
@@ -154,6 +177,11 @@ function startGame() {
 
     // ========== UPDATE ==========
     function update() {
+        // Set global frame for enemies.js live learning
+        if (window.enemyLearning) {
+            window.enemyLearning.setGlobalFrame(frame);
+        }
+
         // Player movement
         const leftPressed = keys['ArrowLeft'] || keys['KeyA'];
         const rightPressed = keys['ArrowRight'] || keys['KeyD'];
@@ -165,7 +193,7 @@ function startGame() {
         if (upPressed) player.y = Math.max(0, player.y - player.speed);
         if (downPressed) player.y = Math.min(768 - player.height, player.y + player.speed);
 
-        // Update stats for learning AI
+        // Update stats for cross‑game learning
         gameStats.totalFrames++;
         gameStats.avgX = (gameStats.avgX * (gameStats.totalFrames - 1) + (player.x / canvas.width)) / gameStats.totalFrames;
         gameStats.avgY = (gameStats.avgY * (gameStats.totalFrames - 1) + (player.y / canvas.height)) / gameStats.totalFrames;
@@ -181,7 +209,8 @@ function startGame() {
         const oneHitKillActive = window.cheatSystem ? window.cheatSystem.isCheatActive('onehitkill') : false;
 
         // Shooting
-        if (keys['Space'] && shootCooldown <= 0) {
+        const shotThisFrame = keys['Space'] && shootCooldown <= 0;
+        if (shotThisFrame) {
             bullets.push({
                 x: player.x + player.width/2 - 2,
                 y: player.y - 10,
@@ -195,6 +224,11 @@ function startGame() {
         }
         if (shootCooldown > 0) shootCooldown--;
 
+        // ========== REAL‑TIME LIVE LEARNING ==========
+        if (window.liveLearning) {
+            window.liveLearning.update(player.x, player.y, shotThisFrame);
+        }
+
         // Update wave manager (enemies)
         waveManager.update();
 
@@ -206,7 +240,6 @@ function startGame() {
 
         // Enemy shooting – rate increases with wave and learning
         let enemyShootRate = Math.min(0.5, 0.2 + currentWave * 0.02);
-        // If player shoots a lot, enemies shoot more (learning)
         if (window.enemyLearning && window.enemyLearning.getProfile().shotsPerFrame > 0.05) {
             enemyShootRate += 0.1;
         }
@@ -278,6 +311,23 @@ function startGame() {
                     if (player.lives <= 0) gameOver = true;
                     break;
                 }
+            }
+        }
+
+        // ========== MULTIPLAYER NETWORK SYNC ==========
+        if (multiplayerActive && window.network) {
+            // Send our player state to remote
+            window.network.sendPlayerState({
+                x: player.x,
+                y: player.y,
+                width: player.width,
+                height: player.height,
+                lives: player.lives
+            });
+
+            // If we are the host, also send enemy positions for co‑op
+            if (isHost && window.network.sendEnemyState) {
+                window.network.sendEnemyState(waveManager.getSerializedEnemies());
             }
         }
 
@@ -358,7 +408,7 @@ function startGame() {
             }
         }
 
-        // Draw enemies
+        // Draw enemies (including remote player if in versus mode)
         waveManager.enemies.forEach(e => {
             if (assets.images && assets.images[e.type]) {
                 ctx.drawImage(assets.images[e.type], e.x, e.y, e.width, e.height);
@@ -367,6 +417,20 @@ function startGame() {
                 ctx.fillRect(e.x, e.y, e.width, e.height);
             }
         });
+
+        // Draw remote player (if in multiplayer and not already in enemies list)
+        if (multiplayerActive && remotePlayer) {
+            // Draw as a different color (e.g., purple) to distinguish
+            if (assets.images && assets.images.player) {
+                // Optionally tint or use a different sprite
+                ctx.globalAlpha = 0.7;
+                ctx.drawImage(assets.images.player, remotePlayer.x, remotePlayer.y, remotePlayer.width || 50, remotePlayer.height || 50);
+                ctx.globalAlpha = 1.0;
+            } else {
+                ctx.fillStyle = 'purple';
+                ctx.fillRect(remotePlayer.x, remotePlayer.y, remotePlayer.width || 50, remotePlayer.height || 50);
+            }
+        }
 
         // Draw player bullets
         bullets.forEach(b => {
@@ -391,6 +455,14 @@ function startGame() {
         // Draw cheat menu if open
         if (cheatMenuOpen && window.cheatSystem) {
             window.cheatSystem.drawCheatMenu(ctx, canvas.width, canvas.height);
+        }
+
+        // Draw multiplayer status
+        if (multiplayerActive) {
+            ctx.font = '16px "Press Start 2P", monospace';
+            ctx.fillStyle = '#0ff';
+            ctx.textAlign = 'right';
+            ctx.fillText('MULTIPLAYER', canvas.width - 20, 40);
         }
     }
 
