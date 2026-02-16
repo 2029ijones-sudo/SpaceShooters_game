@@ -1,5 +1,6 @@
 // ==================== ENEMIES.JS ====================
-// Enemy definition
+console.log('enemies.js loaded'); // Confirm file is loaded
+
 class Enemy {
     constructor(x, y, type = 'enemy1') {
         this.x = x;
@@ -9,13 +10,12 @@ class Enemy {
         this.height = 40;
         this.speed = 2;
         this.hp = 1;
-        this.pattern = 'down'; // movement pattern
+        this.pattern = 'down';
         this.frame = 0;
         this.lastShot = 0;
     }
 
     update(playerX, playerY) {
-        // Basic movement: go down, sometimes sideways
         this.y += this.speed;
         if (this.pattern === 'sine') {
             this.x += Math.sin(this.frame * 0.1) * 1.5;
@@ -24,9 +24,8 @@ class Enemy {
     }
 
     shoot() {
-        // Enemy shooting logic (called from game loop)
         return {
-            x: this.x + this.width/2,
+            x: this.x + this.width / 2,
             y: this.y + this.height,
             w: 5,
             h: 10,
@@ -35,19 +34,26 @@ class Enemy {
     }
 }
 
-// Wave manager
 const waveManager = {
     enemies: [],
     waveCount: 0,
     spawnTimer: 0,
-    spawnInterval: 60, // frames
+    spawnInterval: 30,          // reduced from 60 for faster spawning (debug)
     enemiesPerWave: 5,
     active: true,
 
     update() {
-        if (!this.active) return;
+        if (!this.active) {
+            console.log('waveManager is inactive');
+            return;
+        }
 
-        // Spawn new enemies over time
+        // Debug: log timer and enemy count occasionally
+        if (this.spawnTimer % 30 === 0) {
+            console.log(`spawnTimer: ${this.spawnTimer}, enemies: ${this.enemies.length}`);
+        }
+
+        // Spawn new enemies
         if (this.spawnTimer <= 0 && this.enemies.length < 20) {
             this.spawnEnemy();
             this.spawnTimer = this.spawnInterval;
@@ -72,22 +78,26 @@ const waveManager = {
         const y = -40;
         const type = Math.random() < 0.7 ? 'enemy1' : 'enemy2';
         const enemy = new Enemy(x, y, type);
-        // Set pattern based on wave
         enemy.pattern = this.waveCount % 2 === 0 ? 'down' : 'sine';
         this.enemies.push(enemy);
+        console.log(`Spawned enemy at (${x}, ${y}), type: ${type}, total enemies: ${this.enemies.length}`);
     },
 
     startWave() {
         this.waveCount++;
         this.spawnInterval = Math.max(20, 60 - this.waveCount * 2);
         this.enemiesPerWave = 5 + this.waveCount;
-        // Reset spawn timer
-        this.spawnTimer = 30;
+        this.spawnTimer = 30;          // first enemy appears after 30 frames
+        console.log(`Wave ${this.waveCount} started, spawnInterval: ${this.spawnInterval}`);
     },
 
     reset() {
         this.enemies = [];
         this.waveCount = 0;
         this.spawnTimer = 0;
+        console.log('waveManager reset');
     }
 };
+
+// Expose waveManager globally (already is, but just to be sure)
+window.waveManager = waveManager;
