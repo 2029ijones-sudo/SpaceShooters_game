@@ -1,5 +1,5 @@
 // ==================== ENEMIES.JS ====================
-console.log('enemies.js loaded'); // Confirm file is loaded
+console.log('enemies.js loaded');
 
 class Enemy {
     constructor(x, y, type = 'enemy1') {
@@ -38,30 +38,23 @@ const waveManager = {
     enemies: [],
     waveCount: 0,
     spawnTimer: 0,
-    spawnInterval: 30,          // reduced from 60 for faster spawning (debug)
+    spawnInterval: 30,
     enemiesPerWave: 5,
     active: true,
 
     update() {
-        if (!this.active) {
-            console.log('waveManager is inactive');
-            return;
-        }
+        if (!this.active) return;
 
-        // Debug: log timer and enemy count occasionally
-        if (this.spawnTimer % 30 === 0) {
-            console.log(`spawnTimer: ${this.spawnTimer}, enemies: ${this.enemies.length}`);
-        }
+        // 1. Decrement spawn timer
+        this.spawnTimer--;
 
-        // Spawn new enemies
+        // 2. Spawn new enemy if timer reached 0 and we haven't exceeded limit
         if (this.spawnTimer <= 0 && this.enemies.length < 20) {
             this.spawnEnemy();
             this.spawnTimer = this.spawnInterval;
-        } else {
-            this.spawnTimer--;
         }
 
-        // Update all enemies
+        // 3. Update all enemies
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
             e.update();
@@ -87,7 +80,7 @@ const waveManager = {
         this.waveCount++;
         this.spawnInterval = Math.max(20, 60 - this.waveCount * 2);
         this.enemiesPerWave = 5 + this.waveCount;
-        this.spawnTimer = 30;          // first enemy appears after 30 frames
+        this.spawnTimer = 30; // first enemy appears after 30 frames
         console.log(`Wave ${this.waveCount} started, spawnInterval: ${this.spawnInterval}`);
     },
 
@@ -99,5 +92,4 @@ const waveManager = {
     }
 };
 
-// Expose waveManager globally (already is, but just to be sure)
 window.waveManager = waveManager;
