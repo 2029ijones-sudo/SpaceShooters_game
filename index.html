@@ -2,105 +2,45 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SPACESHOOTERS · 1984</title>
+    <title>SPACESHOOTERS · FULLSCREEN CRT</title>
     <style>
-        /* Retro arcade styling - amplified */
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
         * {
             box-sizing: border-box;
             image-rendering: pixelated;
             image-rendering: crisp-edges;
+            margin: 0;
+            padding: 0;
         }
 
         body {
-            margin: 0;
-            min-height: 100vh;
-            background: #0a0c0f;
-            background-image: radial-gradient(circle at 30% 30%, #1a2a3a 0%, #030405 90%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-family: 'Press Start 2P', 'Courier New', monospace;
-            position: relative;
-        }
-
-        /* Arcade cabinet bezel - beefier */
-        .cabinet {
-            background: #2a1e0e;
-            padding: 30px 40px 60px 40px; /* more space at bottom for real controls */
-            border-radius: 60px 60px 30px 30px;
-            box-shadow: 
-                0 20px 0 #1a1208,
-                0 40px 40px rgba(0,0,0,0.8),
-                inset 0 -10px 20px #3f2e18,
-                inset 0 10px 20px #5c3f1e;
-            border: 4px solid #aa7e55;
-            position: relative;
-        }
-
-        /* Marquee / top sign - enhanced glow */
-        .cabinet::before {
-            content: "◀ SPACE SHOOTERS ▶";
-            position: absolute;
-            top: -25px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #ffd700;
-            color: #3b1e08;
-            font-size: 24px;
-            padding: 12px 40px;
-            border-radius: 50px;
-            box-shadow: 0 8px 0 #b8860b, inset 0 2px 15px #ffeeaa, 0 0 30px #ffaa00;
-            text-shadow: 3px 3px 0 #aa7e55;
-            letter-spacing: 4px;
-            white-space: nowrap;
-            border: 3px solid #fa0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: black;
             font-family: 'Press Start 2P', monospace;
-            animation: marqueePulse 2s infinite;
+            position: relative;
         }
 
-        @keyframes marqueePulse {
-            0% { box-shadow: 0 8px 0 #b8860b, inset 0 2px 15px #ffeeaa, 0 0 30px #ffaa00; }
-            50% { box-shadow: 0 8px 0 #b8860b, inset 0 2px 20px #ffffaa, 0 0 50px #ffdd55; }
-            100% { box-shadow: 0 8px 0 #b8860b, inset 0 2px 15px #ffeeaa, 0 0 30px #ffaa00; }
-        }
-
-        /* Screen bezel */
-        .screen-bezel {
-            background: #1e160e;
-            padding: 25px;
-            border-radius: 40px;
-            box-shadow: 
-                inset 0 0 0 4px #7b5f3f,
-                inset 0 0 20px #000;
-            border: 2px solid #ad8b67;
-        }
-
-        /* CRT screen */
+        /* Canvas – fullscreen, no borders */
         #gameCanvas {
             display: block;
-            width: 1024px;
-            height: 768px;
-            border-radius: 20px;
+            width: 100vw;
+            height: 100vh;
             background: #03050f;
-            box-shadow: 
-                0 0 0 4px #3d2e1b,
-                0 0 0 8px #5b452a,
-                0 20px 30px black;
             image-rendering: crisp-edges;
             cursor: none;
         }
 
-        /* Scanlines & CRT glow */
+        /* ===== CRT EFFECTS (overlay) ===== */
         .crt::after {
             content: " ";
-            display: block;
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
-            bottom: 0;
-            right: 0;
+            width: 100vw;
+            height: 100vh;
             background: repeating-linear-gradient(
                 0deg,
                 rgba(0, 255, 255, 0.03) 0px,
@@ -109,60 +49,108 @@
                 transparent 5px
             );
             pointer-events: none;
-            border-radius: 20px;
             z-index: 5;
+            animation: scanlines 8s linear infinite;
+        }
+
+        @keyframes scanlines {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 10px; }
         }
 
         .crt::before {
             content: " ";
-            display: block;
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            width: 100vw;
+            height: 100vh;
             background: radial-gradient(circle at 50% 50%, transparent 30%, rgba(0, 40, 80, 0.3) 90%);
-            border-radius: 20px;
             pointer-events: none;
             z-index: 4;
         }
 
-        /* UI overlay (lives & score) - now with extra retro flair */
+        /* Static overlay – randomly toggled */
+        .static-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48ZmlsdGVyIGlkPSJmIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iLjk4IiBudW1PY3RhdmVzPSIzIiAvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNmKSIgb3BhY2l0eT0iMC4xIiAvPjwvc3ZnPg==');
+            opacity: 0;
+            pointer-events: none;
+            z-index: 10;
+            transition: opacity 0.2s;
+            mix-blend-mode: screen;
+        }
+
+        .static-overlay.active {
+            opacity: 0.15;
+        }
+
+        /* Glitch/out-of-service overlay */
+        .glitch-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: black;
+            color: #0ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            text-align: center;
+            z-index: 20;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+            text-shadow: 0 0 20px cyan;
+            border: 4px solid cyan;
+            box-shadow: inset 0 0 50px cyan;
+        }
+
+        .glitch-overlay.active {
+            opacity: 0.9;
+            pointer-events: none;
+            animation: glitchText 0.3s infinite;
+        }
+
+        @keyframes glitchText {
+            0% { transform: skew(0deg, 0deg); opacity: 0.9; }
+            20% { transform: skew(2deg, 1deg); opacity: 0.8; }
+            40% { transform: skew(-2deg, -1deg); opacity: 0.9; }
+            60% { transform: skew(1deg, -1deg); opacity: 0.7; }
+            80% { transform: skew(-1deg, 2deg); opacity: 0.9; }
+            100% { transform: skew(0deg, 0deg); opacity: 0.9; }
+        }
+
+        /* UI overlay (lives & score) – now positioned absolutely over canvas */
         #ui {
-            position: absolute;
-            top: 50px;
-            left: 60px;
+            position: fixed;
+            top: 20px;
+            left: 20px;
             color: #0ff;
             font-family: 'Press Start 2P', monospace;
             font-size: 22px;
-            text-shadow: 
-                0 0 5px #0ff,
-                0 0 15px #0ff;
+            text-shadow: 0 0 5px #0ff, 0 0 15px #0ff;
             background: rgba(0, 0, 0, 0.7);
-            padding: 20px 30px;
+            padding: 15px 25px;
             border: 4px solid #3fa;
             border-radius: 30px;
-            box-shadow: 
-                0 0 0 2px #0a8,
-                inset 0 0 10px #0f0;
-            letter-spacing: 2px;
+            box-shadow: 0 0 0 2px #0a8, inset 0 0 10px #0f0;
             z-index: 30;
             backdrop-filter: blur(2px);
         }
 
-        #ui span {
-            margin-right: 30px;
-        }
-
-        #lives, #score {
-            color: #ff69b4;
-            text-shadow: 0 0 8px #f0f;
-            margin-left: 8px;
-        }
+        #ui span { margin-right: 20px; }
+        #lives, #score { color: #ff69b4; text-shadow: 0 0 8px #f0f; margin-left: 5px; }
 
         /* Game Over screen */
         #gameOver {
-            position: absolute;
+            position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
@@ -172,9 +160,7 @@
             padding: 3rem 5rem;
             border-radius: 40px;
             border: 6px solid #f00;
-            box-shadow: 
-                0 0 30px #f00,
-                inset 0 0 30px #f00;
+            box-shadow: 0 0 30px #f00, inset 0 0 30px #f00;
             display: none;
             z-index: 40;
             text-align: center;
@@ -210,21 +196,21 @@
             box-shadow: 0 0 40px cyan;
         }
 
-        /* ===== REAL CONTROL PANEL ===== */
+        /* Control panel – floating at bottom */
         .real-controls {
-            position: absolute;
-            bottom: -20px;
+            position: fixed;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            gap: 30px;
-            background: #332211;
-            padding: 20px 40px;
-            border-radius: 60px 60px 20px 20px;
-            border-top: 6px solid #b88c5e;
-            border-bottom: 4px solid #4d3a24;
-            box-shadow: 0 15px 0 #1a1208, 0 20px 20px black;
-            z-index: 50;
+            gap: 20px;
+            background: #332211cc;
+            backdrop-filter: blur(5px);
+            padding: 15px 30px;
+            border-radius: 60px;
+            border: 4px solid #b88c5e;
+            box-shadow: 0 10px 0 #1a1208, 0 20px 20px black;
+            z-index: 100;
         }
 
         .arcade-button {
@@ -233,11 +219,7 @@
             height: 70px;
             border-radius: 50%;
             border: none;
-            box-shadow: 
-                0 8px 0 #822,
-                0 12px 15px black,
-                inset 0 -4px 4px #faa,
-                inset 0 4px 4px #fff5;
+            box-shadow: 0 8px 0 #822, 0 12px 15px black, inset 0 -4px 4px #faa, inset 0 4px 4px #fff5;
             cursor: pointer;
             transition: 0.05s linear;
             display: flex;
@@ -252,21 +234,9 @@
             text-align: center;
         }
 
-        .arcade-button.green {
-            background: #4a4;
-            box-shadow: 0 8px 0 #282, 0 12px 15px black, inset 0 -4px 4px #8f8, inset 0 4px 4px #fff5;
-        }
-
-        .arcade-button.blue {
-            background: #44a;
-            box-shadow: 0 8px 0 #228, 0 12px 15px black, inset 0 -4px 4px #88f, inset 0 4px 4px #fff5;
-        }
-
-        .arcade-button:active {
-            transform: translateY(6px);
-            box-shadow: 0 2px 0 #822, 0 8px 10px black;
-        }
-
+        .arcade-button.green { background: #4a4; box-shadow: 0 8px 0 #282, 0 12px 15px black, inset 0 -4px 4px #8f8, inset 0 4px 4px #fff5; }
+        .arcade-button.blue { background: #44a; box-shadow: 0 8px 0 #228, 0 12px 15px black, inset 0 -4px 4px #88f, inset 0 4px 4px #fff5; }
+        .arcade-button:active { transform: translateY(6px); box-shadow: 0 2px 0 #822, 0 8px 10px black; }
         .arcade-button.green:active { box-shadow: 0 2px 0 #282; }
         .arcade-button.blue:active { box-shadow: 0 2px 0 #228; }
 
@@ -294,11 +264,11 @@
         }
         .status-led.green { background: #0f0; box-shadow: 0 0 15px #0f0; }
 
-        /* Instructions sticker - updated with multiplayer hint */
+        /* Instructions sticker */
         .instructions {
-            position: absolute;
-            bottom: 20px;
-            right: 60px;
+            position: fixed;
+            bottom: 120px;
+            right: 20px;
             color: #6f6;
             font-size: 14px;
             font-family: 'Press Start 2P', monospace;
@@ -309,43 +279,38 @@
             border: 2px solid #3a6ea5;
             z-index: 25;
             line-height: 1.8;
+            backdrop-filter: blur(2px);
         }
-        .instructions span {
-            color: #ffb347;
-        }
-        .instructions .multi {
-            color: #8af;
-            text-shadow: 0 0 8px blue;
-        }
+        .instructions span { color: #ffb347; }
+        .instructions .multi { color: #8af; text-shadow: 0 0 8px blue; }
     </style>
 </head>
-<body>
-    <!-- Arcade cabinet wrapper -->
-    <div class="cabinet">
-        <div class="screen-bezel">
-            <!-- Canvas container with CRT effect -->
-            <div style="position: relative;" class="crt">
-                <canvas id="gameCanvas" width="1024" height="768"></canvas>
-            </div>
-        </div>
+<body class="crt">
+    <!-- Fullscreen canvas -->
+    <canvas id="gameCanvas" width="1024" height="768"></canvas>
 
-        <!-- REAL CONTROL PANEL with interactive buttons -->
-        <div class="real-controls">
-            <button class="arcade-button" id="hostBtn">HOST<br>GAME</button>
-            <button class="arcade-button green" id="joinBtn">JOIN<br>GAME</button>
-            <div class="room-display" id="roomCode">---</div>
-            <div class="status-led" id="connLed"></div>
-            <button class="arcade-button blue" id="disconnectBtn">QUIT</button>
-        </div>
-    </div>
+    <!-- Static overlay (randomly activated) -->
+    <div class="static-overlay" id="staticOverlay"></div>
 
-    <!-- UI overlay (lives & score) -->
+    <!-- Glitch/out-of-service overlay -->
+    <div class="glitch-overlay" id="glitchOverlay">📺 OUT OF SERVICE<br><span style="font-size:2rem;">⟲ TUNE CHANNEL</span></div>
+
+    <!-- UI overlay -->
     <div id="ui">
         <span>❤️ <span id="lives">3</span></span>
         <span>🔫 <span id="score">0</span></span>
     </div>
 
-    <!-- Instructions sticker – now with multiplayer tips -->
+    <!-- Control panel -->
+    <div class="real-controls">
+        <button class="arcade-button" id="hostBtn">HOST<br>GAME</button>
+        <button class="arcade-button green" id="joinBtn">JOIN<br>GAME</button>
+        <div class="room-display" id="roomCode">---</div>
+        <div class="status-led" id="connLed"></div>
+        <button class="arcade-button blue" id="disconnectBtn">QUIT</button>
+    </div>
+
+    <!-- Instructions -->
     <div class="instructions">
         ← → ↑ ↓  |  SPACE<br>
         <span>🖱️ LEFT CLICK = CHEATS</span><br>
@@ -359,7 +324,7 @@
         <button onclick="window.location.href='menu.html'">MENU</button>
     </div>
 
-    <!-- Scripts – now with network.js -->
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script src="assets.js"></script>
     <script src="enemies.js"></script>
@@ -368,19 +333,14 @@
     <script src="cheats.js"></script>
 
     <script>
-        // ===== Multiplayer UI Controls =====
         (function() {
+            // ===== MULTIPLAYER UI (same as before) =====
             const hostBtn = document.getElementById('hostBtn');
             const joinBtn = document.getElementById('joinBtn');
             const disconnectBtn = document.getElementById('disconnectBtn');
             const roomDisplay = document.getElementById('roomCode');
             const connLed = document.getElementById('connLed');
 
-            let peer = null;
-            let conn = null;
-            let isHost = false;
-
-            // Update LED and room display
             function setConnected(connected, code = '---') {
                 if (connected) {
                     connLed.className = 'status-led green';
@@ -391,19 +351,12 @@
                 }
             }
 
-            // Host a game
             hostBtn.addEventListener('click', () => {
                 if (window.network) {
                     window.network.initPeer(true, null, {
-                        onPlayerJoined: () => {
-                            setConnected(true, window.network.getRoomCode());
-                        },
-                        onEnemyUpdate: (data) => { /* handled in game.js */ },
-                        onPlayerDisconnect: () => {
-                            setConnected(false);
-                        }
+                        onPlayerJoined: () => setConnected(true, window.network.getRoomCode()),
+                        onPlayerDisconnect: () => setConnected(false)
                     }).then(roomCode => {
-                        isHost = true;
                         setConnected(true, roomCode);
                     }).catch(err => {
                         console.error('Host failed', err);
@@ -412,17 +365,12 @@
                 }
             });
 
-            // Join a game
             joinBtn.addEventListener('click', () => {
                 const code = prompt('Enter room code:');
                 if (!code) return;
                 if (window.network) {
                     window.network.initPeer(false, code, {
-                        onPlayerJoined: () => {},
-                        onEnemyUpdate: (data) => { /* handled in game.js */ },
-                        onPlayerDisconnect: () => {
-                            setConnected(false);
-                        }
+                        onPlayerDisconnect: () => setConnected(false)
                     }).then(() => {
                         setConnected(true, code);
                     }).catch(err => {
@@ -432,7 +380,6 @@
                 }
             });
 
-            // Disconnect
             disconnectBtn.addEventListener('click', () => {
                 if (window.network) {
                     window.network.disconnect();
@@ -440,7 +387,38 @@
                 }
             });
 
-            // If network object exposes connection state, we could listen, but this is minimal.
+            // ===== RANDOM STATIC & GLITCH EFFECTS =====
+            const staticOverlay = document.getElementById('staticOverlay');
+            const glitchOverlay = document.getElementById('glitchOverlay');
+
+            // Random static bursts
+            setInterval(() => {
+                if (Math.random() < 0.3) { // 30% chance every 10 seconds
+                    staticOverlay.classList.add('active');
+                    setTimeout(() => staticOverlay.classList.remove('active'), 200 + Math.random() * 300);
+                }
+            }, 10000);
+
+            // Random "OUT OF SERVICE" glitches (rare)
+            setInterval(() => {
+                if (Math.random() < 0.1) { // 10% chance every 30 seconds
+                    glitchOverlay.classList.add('active');
+                    // Play a glitch sound? (optional)
+                    setTimeout(() => glitchOverlay.classList.remove('active'), 1500 + Math.random() * 2000);
+                }
+            }, 30000);
+
+            // Also occasional quick blackouts (just static overlay with higher opacity)
+            setInterval(() => {
+                if (Math.random() < 0.2) {
+                    staticOverlay.style.opacity = '0.4';
+                    staticOverlay.classList.add('active');
+                    setTimeout(() => {
+                        staticOverlay.style.opacity = '';
+                        staticOverlay.classList.remove('active');
+                    }, 100);
+                }
+            }, 20000);
         })();
     </script>
 </body>
