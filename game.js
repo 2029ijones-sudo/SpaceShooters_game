@@ -55,11 +55,12 @@ function startGame() {
 
     let bullets = [];
     let enemyBullets = [];
+    let healthPickups = [];            // NEW: health pickups array
     let score = 0;
     let gameOver = false;
     let frame = 0;
 
-    // NEW: Kill count for bullet progression (unlimited)
+    // Kill count for bullet progression (unlimited)
     let killCount = 0;
 
     // Wave tracking
@@ -91,16 +92,13 @@ function startGame() {
     };
 
     // ========== MULTIPLAYER (LAN) ==========
-    let multiplayerActive = false;          // set true when connected
-    let remotePlayer = null;                // { x, y, width, height } from network
-    let isHost = false;                     // determined by network init
+    let multiplayerActive = false;
+    let remotePlayer = null;
+    let isHost = false;
 
-    // If network.js is loaded, it will provide these callbacks
     if (window.network) {
-        // Called when a remote player joins or sends update
         window.network.onRemoteUpdate = (data) => {
             remotePlayer = data;
-            // Also pass to enemies.js multiplayer hook
             if (window.multiplayer) {
                 window.multiplayer.updateRemotePlayer(data);
             }
@@ -114,30 +112,24 @@ function startGame() {
 
     // ========== CHEAT MENU TOGGLE (LEFT CLICK) ==========
     canvas.addEventListener('click', (e) => {
-        if (e.button === 0) { // left click
+        if (e.button === 0) {
             e.preventDefault();
             cheatMenuOpen = !cheatMenuOpen;
-            if (cheatMenuOpen) {
-                console.log('Cheat menu opened');
-            }
+            if (cheatMenuOpen) console.log('Cheat menu opened');
         }
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-    // Keyboard input for cheat menu
     window.addEventListener('keydown', (e) => {
         if (cheatMenuOpen) {
             e.preventDefault();
             if (window.cheatSystem) {
                 window.cheatSystem.handleCheatKey(e);
-                if (e.key === 'Escape') {
-                    cheatMenuOpen = false;
-                }
+                if (e.key === 'Escape') cheatMenuOpen = false;
             }
         }
     });
 
-    // Function to apply cheat effects that modify game state directly
     window.applyCheatEffect = (cheatId) => {
         switch(cheatId) {
             case 'extralife':
@@ -146,7 +138,6 @@ function startGame() {
                 waveMessage = 'EXTRA LIFE!';
                 waveMessageTimer = 60;
                 break;
-            // Other cheats are handled via flags in update()
         }
     };
 
@@ -161,45 +152,32 @@ function startGame() {
     function gameLoop() {
         if (gameOver) {
             document.getElementById('gameOver').style.display = 'block';
-            // Save learning stats on game over
-            if (window.enemyLearning) {
-                window.enemyLearning.updateProfile(gameStats);
-            }
-            // Disconnect from multiplayer
+            if (window.enemyLearning) window.enemyLearning.updateProfile(gameStats);
             if (window.network) window.network.disconnect();
             return;
         }
 
-        if (!cheatMenuOpen) {
-            update();
-        }
+        if (!cheatMenuOpen) update();
         draw();
-
         requestAnimationFrame(gameLoop);
     }
 
     // ========== HELPER: Generate bullets based on kill count ==========
     function createBullets(playerX, playerY, playerWidth, baseSpeed, rapidFireActive) {
         const bulletsArray = [];
-        // Base bullet properties
         let baseWidth = 4;
         let baseHeight = 15;
-        let baseSpeedValue = -8; // negative = upward
+        let baseSpeedValue = -8;
 
-        // Scale with kill count (unlimited)
-        // Width increases slowly, height increases, speed increases
-        const scale = 1 + killCount * 0.02; // 2% per kill, unlimited
+        const scale = 1 + killCount * 0.02;
         const bulletWidth = baseWidth * scale;
         const bulletHeight = baseHeight * scale;
-        const bulletSpeed = baseSpeedValue * (1 + killCount * 0.01); // 1% speed increase per kill
+        const bulletSpeed = baseSpeedValue * (1 + killCount * 0.01);
 
-        // Number of bullets: start with 1, gain an extra bullet every 10 kills
         let bulletCount = 1 + Math.floor(killCount / 10);
-        // Cap bullet count for sanity? No limit, but we can keep it reasonable
-        if (bulletCount > 20) bulletCount = 20; // optional soft cap, but remove if you want truly unlimited
+        if (bulletCount > 20) bulletCount = 20;
 
-        // Create spread
-        const spreadAngle = 0.1; // radians
+        const spreadAngle = 0.1;
         const centerX = playerX + playerWidth / 2;
         const startY = playerY - 10;
 
@@ -212,13 +190,10 @@ function startGame() {
                 speed: bulletSpeed
             });
         } else {
-            // Multiple bullets in a fan
             for (let i = 0; i < bulletCount; i++) {
-                // Angle offset from center
                 const angleOffset = (i - (bulletCount - 1) / 2) * spreadAngle;
-                // Speed vector components
-                const speedX = Math.sin(angleOffset) * Math.abs(bulletSpeed) * 0.5; // slight horizontal
-                const speedY = bulletSpeed * Math.cos(angleOffset); // mostly vertical
+                const speedX = Math.sin(angleOffset) * Math.abs(bulletSpeed) * 0.5;
+                const speedY = bulletSpeed * Math.cos(angleOffset);
                 bulletsArray.push({
                     x: centerX - bulletWidth / 2,
                     y: startY,
@@ -234,10 +209,7 @@ function startGame() {
 
     // ========== UPDATE ==========
     function update() {
-        // Set global frame for enemies.js live learning
-        if (window.enemyLearning) {
-            window.enemyLearning.setGlobalFrame(frame);
-        }
+        if (window.enemyLearning) window.enemyLearning.setGlobalFrame(frame);
 
         // Player movement
         const leftPressed = keys['ArrowLeft'] || keys['KeyA'];
@@ -250,7 +222,7 @@ function startGame() {
         if (upPressed) player.y = Math.max(0, player.y - player.speed);
         if (downPressed) player.y = Math.min(768 - player.height, player.y + player.speed);
 
-        // Update stats for cross‑game learning
+        // Cross‑game learning stats
         gameStats.totalFrames++;
         gameStats.avgX = (gameStats.avgX * (gameStats.totalFrames - 1) + (player.x / canvas.width)) / gameStats.totalFrames;
         gameStats.avgY = (gameStats.avgY * (gameStats.totalFrames - 1) + (player.y / canvas.height)) / gameStats.totalFrames;
@@ -259,34 +231,30 @@ function startGame() {
         if (upPressed) gameStats.upMoves++;
         if (downPressed) gameStats.downMoves++;
 
-        // Check active cheats
+        // Cheat flags
         const rapidFireActive = window.cheatSystem ? window.cheatSystem.isCheatActive('rapidfire') : false;
         const invincibleActive = window.cheatSystem ? window.cheatSystem.isCheatActive('invincible') : false;
         const autoAimActive = window.cheatSystem ? window.cheatSystem.isCheatActive('autotarget') : false;
         const oneHitKillActive = window.cheatSystem ? window.cheatSystem.isCheatActive('onehitkill') : false;
 
-        // Shooting – now uses kill-based bullet creation
+        // Shooting
         const shotThisFrame = keys['Space'] && shootCooldown <= 0;
         if (shotThisFrame) {
-            // Generate bullets based on current kill count
             const newBullets = createBullets(player.x, player.y, player.width, -8, rapidFireActive);
             bullets.push(...newBullets);
             playSound('laser', 0.5);
-            // Cooldown affected by rapid fire cheat
             shootCooldown = rapidFireActive ? 5 : 10;
-            gameStats.shotsFired += newBullets.length; // count all bullets for stats
+            gameStats.shotsFired += newBullets.length;
         }
         if (shootCooldown > 0) shootCooldown--;
 
-        // ========== REAL‑TIME LIVE LEARNING ==========
-        if (window.liveLearning) {
-            window.liveLearning.update(player.x, player.y, shotThisFrame);
-        }
+        // Live learning
+        if (window.liveLearning) window.liveLearning.update(player.x, player.y, shotThisFrame);
 
-        // Update wave manager (enemies)
+        // Update enemies
         waveManager.update();
 
-        // Update player bullets (handle both simple and vector bullets)
+        // Update player bullets
         for (let i = bullets.length - 1; i >= 0; i--) {
             const b = bullets[i];
             if (b.speedX !== undefined) {
@@ -295,23 +263,15 @@ function startGame() {
             } else {
                 b.y += b.speed;
             }
-            // Remove if off screen (top or bottom, but mostly top)
-            if (b.y + b.h < 0 || b.y > canvas.height) {
-                bullets.splice(i, 1);
-            }
+            if (b.y + b.h < 0 || b.y > canvas.height) bullets.splice(i, 1);
         }
 
-        // Enemy shooting – rate increases with wave and learning
+        // Enemy shooting
         let enemyShootRate = Math.min(0.5, 0.2 + currentWave * 0.02);
-        if (window.enemyLearning && window.enemyLearning.getProfile().shotsPerFrame > 0.05) {
-            enemyShootRate += 0.1;
-        }
+        if (window.enemyLearning && window.enemyLearning.getProfile().shotsPerFrame > 0.05) enemyShootRate += 0.1;
         if (frame % 30 === 0) {
             waveManager.enemies.forEach(enemy => {
-                if (Math.random() < enemyShootRate) {
-                    const eb = enemy.shoot();
-                    enemyBullets.push(eb);
-                }
+                if (Math.random() < enemyShootRate) enemyBullets.push(enemy.shoot());
             });
         }
 
@@ -321,34 +281,62 @@ function startGame() {
             if (enemyBullets[i].y > 768) enemyBullets.splice(i, 1);
         }
 
-        // Collisions: player bullets vs enemies – also increment killCount
+        // Collisions: player bullets vs enemies – drop health pickup on kill
         for (let i = bullets.length - 1; i >= 0; i--) {
             const b = bullets[i];
             for (let j = waveManager.enemies.length - 1; j >= 0; j--) {
                 const e = waveManager.enemies[j];
-                if (b.x < e.x + e.width &&
-                    b.x + b.w > e.x &&
-                    b.y < e.y + e.height &&
-                    b.y + b.h > e.y) {
-                    // Hit
+                if (b.x < e.x + e.width && b.x + b.w > e.x &&
+                    b.y < e.y + e.height && b.y + b.h > e.y) {
+                    // Remove enemy and bullet
                     bullets.splice(i, 1);
                     waveManager.enemies.splice(j, 1);
                     score += 10;
-                    killCount++; // Increase kill count – powers up future bullets
+                    killCount++;
+
+                    // NEW: Spawn a health pickup at enemy position (100% drop rate)
+                    healthPickups.push({
+                        x: e.x + e.width/2 - 10,  // centered, size 20x20
+                        y: e.y,
+                        w: 20,
+                        h: 20,
+                        speed: 2                  // falls slowly
+                    });
+
                     playSound('explode', 0.7);
                     break;
                 }
             }
         }
 
-        // Collisions: enemy bullets vs player
+        // Update health pickups – move down and check collection
+        for (let i = healthPickups.length - 1; i >= 0; i--) {
+            const h = healthPickups[i];
+            h.y += h.speed;
+
+            // Remove if off screen
+            if (h.y > canvas.height) {
+                healthPickups.splice(i, 1);
+                continue;
+            }
+
+            // Collision with player
+            if (h.x < player.x + player.width && h.x + h.w > player.x &&
+                h.y < player.y + player.height && h.y + h.h > player.y) {
+                // Collect health
+                player.lives++;
+                document.getElementById('lives').textContent = player.lives;
+                healthPickups.splice(i, 1);
+                playSound('explode', 0.5); // maybe a different sound later
+            }
+        }
+
+        // Enemy bullets vs player
         if (player.invincible <= 0 && !invincibleActive) {
             for (let i = enemyBullets.length - 1; i >= 0; i--) {
                 const eb = enemyBullets[i];
-                if (eb.x < player.x + player.width &&
-                    eb.x + eb.w > player.x &&
-                    eb.y < player.y + player.height &&
-                    eb.y + eb.h > player.y) {
+                if (eb.x < player.x + player.width && eb.x + eb.w > player.x &&
+                    eb.y < player.y + player.height && eb.y + eb.h > player.y) {
                     enemyBullets.splice(i, 1);
                     player.lives--;
                     player.invincible = 60;
@@ -361,14 +349,12 @@ function startGame() {
             player.invincible--;
         }
 
-        // Collisions: enemies vs player
+        // Enemies vs player
         if (player.invincible <= 0 && !invincibleActive) {
             for (let i = waveManager.enemies.length - 1; i >= 0; i--) {
                 const e = waveManager.enemies[i];
-                if (e.x < player.x + player.width &&
-                    e.x + e.width > player.x &&
-                    e.y < player.y + player.height &&
-                    e.y + e.height > player.y) {
+                if (e.x < player.x + player.width && e.x + e.width > player.x &&
+                    e.y < player.y + player.height && e.y + e.height > player.y) {
                     waveManager.enemies.splice(i, 1);
                     player.lives--;
                     player.invincible = 60;
@@ -379,24 +365,17 @@ function startGame() {
             }
         }
 
-        // ========== MULTIPLAYER NETWORK SYNC ==========
+        // Multiplayer sync
         if (multiplayerActive && window.network) {
-            // Send our player state to remote
             window.network.sendPlayerState({
-                x: player.x,
-                y: player.y,
-                width: player.width,
-                height: player.height,
-                lives: player.lives
+                x: player.x, y: player.y, width: player.width, height: player.height, lives: player.lives
             });
-
-            // If we are the host, also send enemy positions for co‑op
             if (isHost && window.network.sendEnemyState) {
                 window.network.sendEnemyState(waveManager.getSerializedEnemies());
             }
         }
 
-        // Update UI (show kill count optionally)
+        // Update UI
         document.getElementById('lives').textContent = player.lives;
         document.getElementById('score').textContent = score;
 
@@ -408,36 +387,26 @@ function startGame() {
             waveMessage = `WAVE ${currentWave}`;
             waveMessageTimer = 60;
         }
-
-        // Update wave message timer
         if (waveMessageTimer > 0) waveMessageTimer--;
 
         // Auto‑aim cheat
         if (autoAimActive && waveManager.enemies.length > 0) {
             bullets.forEach(b => {
-                let closestDist = Infinity;
-                let closestEnemy = null;
+                let closestDist = Infinity, closestEnemy = null;
                 waveManager.enemies.forEach(e => {
                     const dx = (e.x + e.width/2) - (b.x + b.w/2);
                     const dy = (e.y + e.height/2) - (b.y + b.h/2);
                     const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist < closestDist) {
-                        closestDist = dist;
-                        closestEnemy = e;
-                    }
+                    if (dist < closestDist) { closestDist = dist; closestEnemy = e; }
                 });
                 if (closestEnemy) {
                     const targetX = closestEnemy.x + closestEnemy.width/2;
                     const targetY = closestEnemy.y + closestEnemy.height/2;
                     const dx = targetX - (b.x + b.w/2);
                     const dy = targetY - (b.y + b.h/2);
-                    // For bullets with speedX/speedY, we'd need more complex homing.
-                    // Simplified: just adjust x position gradually
                     if (b.speedX !== undefined) {
-                        // Vector bullet – adjust velocity slightly
                         b.speedX += Math.sign(dx) * 0.2;
                         b.speedY += Math.sign(dy) * 0.2;
-                        // Normalize to keep speed roughly constant
                         const sp = Math.sqrt(b.speedX*b.speedX + b.speedY*b.speedY);
                         if (sp > 0) {
                             b.speedX = (b.speedX / sp) * Math.abs(b.speedY);
@@ -457,7 +426,7 @@ function startGame() {
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Draw background (video or starfield)
+        // Background
         if (assets.videos && assets.videos.nebula && assets.videos.nebula.readyState >= 2) {
             ctx.drawImage(assets.videos.nebula, 0, 0, canvas.width, canvas.height);
         } else {
@@ -469,7 +438,7 @@ function startGame() {
             }
         }
 
-        // Draw wave message if active
+        // Wave message
         if (waveMessageTimer > 0) {
             ctx.font = '40px "Press Start 2P", monospace';
             ctx.fillStyle = '#ffd966';
@@ -477,7 +446,7 @@ function startGame() {
             ctx.fillText(waveMessage, canvas.width/2, 300);
         }
 
-        // Draw player
+        // Player
         if (player.invincible <= 0 || Math.floor(frame / 5) % 2 === 0) {
             if (assets.images && assets.images.player) {
                 ctx.drawImage(assets.images.player, player.x, player.y, player.width, player.height);
@@ -487,7 +456,7 @@ function startGame() {
             }
         }
 
-        // Draw enemies
+        // Enemies
         waveManager.enemies.forEach(e => {
             if (assets.images && assets.images[e.type]) {
                 ctx.drawImage(assets.images[e.type], e.x, e.y, e.width, e.height);
@@ -497,7 +466,7 @@ function startGame() {
             }
         });
 
-        // Draw remote player (if in multiplayer)
+        // Remote player
         if (multiplayerActive && remotePlayer) {
             if (assets.images && assets.images.player) {
                 ctx.globalAlpha = 0.7;
@@ -509,10 +478,26 @@ function startGame() {
             }
         }
 
-        // Draw player bullets (now potentially with varying sizes)
+        // Health pickups (draw as green hearts)
+        healthPickups.forEach(h => {
+            // If we have a heart image, use it; otherwise draw a green cross/heart
+            if (assets.images && assets.images.heart) {
+                ctx.drawImage(assets.images.heart, h.x, h.y, h.w, h.h);
+            } else {
+                ctx.fillStyle = '#0f0';
+                ctx.beginPath();
+                ctx.arc(h.x + h.w/2, h.y + h.h/2, h.w/2, 0, Math.PI*2);
+                ctx.fill();
+                // Draw a white cross
+                ctx.fillStyle = 'white';
+                ctx.fillRect(h.x + h.w/2 - 2, h.y + 4, 4, h.h-8);
+                ctx.fillRect(h.x + 4, h.y + h.h/2 - 2, h.w-8, 4);
+            }
+        });
+
+        // Player bullets
         bullets.forEach(b => {
             if (assets.images && assets.images.bullet) {
-                // Scale image to bullet dimensions
                 ctx.drawImage(assets.images.bullet, b.x, b.y, b.w, b.h);
             } else {
                 ctx.fillStyle = 'yellow';
@@ -520,7 +505,7 @@ function startGame() {
             }
         });
 
-        // Draw enemy bullets
+        // Enemy bullets
         enemyBullets.forEach(b => {
             if (assets.images && assets.images.enemyBullet) {
                 ctx.drawImage(assets.images.enemyBullet, b.x, b.y, b.w, b.h);
@@ -530,12 +515,12 @@ function startGame() {
             }
         });
 
-        // Draw cheat menu if open
+        // Cheat menu
         if (cheatMenuOpen && window.cheatSystem) {
             window.cheatSystem.drawCheatMenu(ctx, canvas.width, canvas.height);
         }
 
-        // Draw multiplayer status
+        // Multiplayer status
         if (multiplayerActive) {
             ctx.font = '16px "Press Start 2P", monospace';
             ctx.fillStyle = '#0ff';
@@ -543,17 +528,15 @@ function startGame() {
             ctx.fillText('MULTIPLAYER', canvas.width - 20, 40);
         }
 
-        // Optionally display kill count for feedback
+        // Kill count
         ctx.font = '16px "Press Start 2P", monospace';
         ctx.fillStyle = '#ff0';
         ctx.textAlign = 'left';
         ctx.fillText(`KILLS: ${killCount}`, 20, 100);
     }
 
-    // Start game loop
     gameLoop();
 
-    // Background music – plays after first user click/tap
     document.addEventListener('click', function playBGM() {
         if (assets.sounds && assets.sounds.bgm) {
             assets.sounds.bgm.loop = true;
