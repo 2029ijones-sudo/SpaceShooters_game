@@ -1,13 +1,42 @@
 // ==================== GAME.JS ====================
 // Wait for assets to load
 window.addEventListener('load', () => {
+    console.log('Page loaded, calling loadAssets...');
     loadAssets(startGame);
 });
 
 function startGame() {
+    console.log('startGame() called – assets loaded, game starting');
+
+    // Ensure waveManager exists (from enemies.js)
+    if (typeof waveManager === 'undefined') {
+        console.error('waveManager not found! Check that enemies.js is loaded before game.js');
+        // Create a dummy waveManager so game doesn't crash
+        window.waveManager = {
+            enemies: [],
+            update: function() {},
+            startWave: function() { console.log('Dummy wave started'); }
+        };
+    }
+
     // Canvas setup
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+
+    // Play background video if available
+    if (assets.videos && assets.videos.nebula) {
+        assets.videos.nebula.play().catch(e => {
+            console.log('Background video autoplay failed:', e);
+            // Will try to play on first user interaction
+            const playVideoOnGesture = () => {
+                assets.videos.nebula.play().catch(() => {});
+                document.removeEventListener('click', playVideoOnGesture);
+                document.removeEventListener('keydown', playVideoOnGesture);
+            };
+            document.addEventListener('click', playVideoOnGesture);
+            document.addEventListener('keydown', playVideoOnGesture);
+        });
+    }
 
     // Game state
     let player = {
@@ -70,20 +99,20 @@ function startGame() {
         }
         if (shootCooldown > 0) shootCooldown--;
 
-        // Update wave manager
+        // Update wave manager (enemies)
         waveManager.update();
 
-        // Update bullets (player)
+        // Update player bullets
         for (let i = bullets.length - 1; i >= 0; i--) {
             bullets[i].y += bullets[i].speed;
             if (bullets[i].y + bullets[i].h < 0) bullets.splice(i, 1);
         }
 
-        // Enemy shooting
+        // Enemy shooting (every 30 frames)
         if (frame % 30 === 0) {
             waveManager.enemies.forEach(enemy => {
                 if (Math.random() < 0.3) {
-                    const eb = enemy.shoot();
+                    const eb = enemy.shoot();  // returns {x, y, w, h, speed}
                     enemyBullets.push(eb);
                 }
             });
@@ -109,7 +138,7 @@ function startGame() {
                     waveManager.enemies.splice(j, 1);
                     score += 10;
                     playSound('explode', 0.7);
-                    break; // bullet gone
+                    break; // bullet destroyed, exit inner loop
                 }
             }
         }
@@ -130,7 +159,7 @@ function startGame() {
                     if (player.lives <= 0) {
                         gameOver = true;
                     }
-                    break;
+                    break; // only one hit per frame
                 }
             }
         } else {
@@ -173,11 +202,12 @@ function startGame() {
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Draw background (optional video or starfield)
-        if (assets.videos.nebula) {
+        // Draw background (video or starfield)
+        if (assets.videos && assets.videos.nebula && assets.videos.nebula.readyState >= 2) {
+            // Video is ready to draw
             ctx.drawImage(assets.videos.nebula, 0, 0, canvas.width, canvas.height);
         } else {
-            // Simple starfield
+            // Simple starfield fallback
             ctx.fillStyle = 'white';
             for (let i = 0; i < 100; i++) {
                 let sx = (i * 73) % canvas.width;
@@ -188,7 +218,7 @@ function startGame() {
 
         // Draw player (with invincibility blink)
         if (player.invincible <= 0 || Math.floor(frame / 5) % 2 === 0) {
-            if (assets.images.player) {
+            if (assets.images && assets.images.player) {
                 ctx.drawImage(assets.images.player, player.x, player.y, player.width, player.height);
             } else {
                 ctx.fillStyle = 'cyan';
@@ -198,7 +228,7 @@ function startGame() {
 
         // Draw enemies
         waveManager.enemies.forEach(e => {
-            if (assets.images[e.type]) {
+            if (assets.images && assets.images[e.type]) {
                 ctx.drawImage(assets.images[e.type], e.x, e.y, e.width, e.height);
             } else {
                 ctx.fillStyle = 'red';
@@ -208,7 +238,7 @@ function startGame() {
 
         // Draw player bullets
         bullets.forEach(b => {
-            if (assets.images.bullet) {
+            if (assets.images && assets.images.bullet) {
                 ctx.drawImage(assets.images.bullet, b.x, b.y, b.w, b.h);
             } else {
                 ctx.fillStyle = 'yellow';
@@ -218,26 +248,26 @@ function startGame() {
 
         // Draw enemy bullets
         enemyBullets.forEach(b => {
-            if (assets.images.enemyBullet) {
+            if (assets.images && assets.images.enemyBullet) {
                 ctx.drawImage(assets.images.enemyBullet, b.x, b.y, b.w, b.h);
             } else {
                 ctx.fillStyle = 'orange';
                 ctx.fillRect(b.x, b.y, b.w, b.h);
             }
         });
-
-        // Draw score etc on canvas as fallback (already in HTML UI)
     }
 
     // Start the game loop
     gameLoop();
 
-    // Optionally play background music (after user gesture)
+    // Background music – plays after first user click/tap
     document.addEventListener('click', function playBGM() {
-        if (assets.sounds.bgm) {
+        if (assets.sounds && assets.sounds.bgm) {
             assets.sounds.bgm.loop = true;
-            assets.sounds.bgm.volume = (localStorage.getItem('spaceShooters_volume') / 100) * 0.5;
-            assets.sounds.bgm.play().catch(e => {});
+            let vol = localStorage.getItem('spaceShooters_volume');
+            if (vol === null) vol = 70;
+            assets.sounds.bgm.volume = (vol / 100) * 0.5; // 50% of master volume for BGM
+            assets.sounds.bgm.play().catch(e => console.log('BGM play failed:', e));
         }
         document.removeEventListener('click', playBGM);
     }, { once: true });
