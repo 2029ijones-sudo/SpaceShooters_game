@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SpaceShooters – Menu</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            background: radial-gradient(circle at center, #0a0f2a 0%, #000 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Arial', sans-serif;
+            color: white;
+        }
+        .menu {
+            text-align: center;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 3rem 4rem;
+            border-radius: 2rem;
+            border: 2px solid #3a6ea5;
+            box-shadow: 0 0 30px #3a6ea5;
+        }
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 2rem;
+            text-shadow: 0 0 10px cyan;
+            letter-spacing: 4px;
+        }
+        .btn {
+            display: block;
+            width: 200px;
+            margin: 1rem auto;
+            padding: 1rem;
+            background: #1e2a47;
+            color: white;
+            text-decoration: none;
+            font-size: 1.5rem;
+            border-radius: 2rem;
+            border: 2px solid #4aa;
+            transition: 0.3s;
+        }
+        .btn:hover {
+            background: #2a3f66;
+            box-shadow: 0 0 20px cyan;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="menu">
+        <h1>🚀 SPACESHOOTERS</h1>
+        <a href="index.html" class="btn">▶ PLAY</a>
+        <a href="options.html" class="btn">⚙ OPTIONS</a>
+        <a href="#" class="btn" onclick="alert('Use WASD / arrows to move, Space to fire. Survive waves!');">❓ HELP</a>
+    </div>
+</body>
+</html>
