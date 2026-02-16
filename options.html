@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SpaceShooters – Options</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            background: radial-gradient(circle at center, #0a0f2a 0%, #000 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Arial', sans-serif;
+            color: white;
+        }
+        .options {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 2rem 3rem;
+            border-radius: 2rem;
+            border: 2px solid #3a6ea5;
+            width: 300px;
+        }
+        h2 {
+            text-align: center;
+            color: cyan;
+        }
+        .setting {
+            margin: 1.5rem 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+        }
+        .btn {
+            display: inline-block;
+            background: #1e2a47;
+            color: white;
+            text-decoration: none;
+            padding: 0.5rem 1.5rem;
+            border-radius: 2rem;
+            border: 2px solid #4aa;
+            margin-top: 1rem;
+        }
+        .back {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="options">
+        <h2>⚙ OPTIONS</h2>
+        <div class="setting">
+            <label>🔊 Master Volume <span id="volValue">70</span>%</label>
+            <input type="range" id="volume" min="0" max="100" value="70">
+        </div>
+        <div class="setting">
+            <label>🎯 Difficulty</label>
+            <select id="difficulty">
+                <option value="easy">Easy</option>
+                <option value="normal" selected>Normal</option>
+                <option value="hard">Hard</option>
+            </select>
+        </div>
+        <div class="back">
+            <a href="menu.html" class="btn">← BACK</a>
+        </div>
+    </div>
+    <script>
+        // Load saved settings
+        const volumeSlider = document.getElementById('volume');
+        const volSpan = document.getElementById('volValue');
+        const difficultySelect = document.getElementById('difficulty');
+
+        // On page load
+        window.addEventListener('load', () => {
+            const savedVol = localStorage.getItem('spaceShooters_volume');
+            const savedDiff = localStorage.getItem('spaceShooters_difficulty');
+            if (savedVol !== null) {
+                volumeSlider.value = savedVol;
+                volSpan.textContent = savedVol;
+            }
+            if (savedDiff !== null) {
+                difficultySelect.value = savedDiff;
+            }
+        });
+
+        // Save on change
+        volumeSlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            volSpan.textContent = val;
+            localStorage.setItem('spaceShooters_volume', val);
+        });
+        difficultySelect.addEventListener('change', (e) => {
+            localStorage.setItem('spaceShooters_difficulty', e.target.value);
+        });
+    </script>
+</body>
+</html>
