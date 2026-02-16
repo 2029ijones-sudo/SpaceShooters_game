@@ -81,7 +81,7 @@
                 0 0 0 4px #3d2e1b,
                 0 0 0 8px #5b452a,
                 0 20px 30px black;
-            image-rendering: crisp-edges; /* pixel art style */
+            image-rendering: crisp-edges;
             cursor: none;
         }
 
@@ -120,7 +120,7 @@
             z-index: 4;
         }
 
-        /* UI overlay – now styled like a retro LED panel */
+        /* UI overlay – retro LED panel */
         #ui {
             position: absolute;
             top: 50px;
@@ -153,7 +153,7 @@
             margin-left: 8px;
         }
 
-        /* Game Over screen – now with blinking neon */
+        /* Game Over screen – blinking neon */
         #gameOver {
             position: absolute;
             top: 50%;
@@ -203,7 +203,7 @@
             box-shadow: 0 0 40px cyan;
         }
 
-        /* Add some fake control panel buttons at the bottom */
+        /* Fake control panel */
         .controls {
             position: absolute;
             bottom: -70px;
@@ -246,7 +246,7 @@
             transform: rotate(15deg);
         }
 
-        /* Small text for instructions */
+        /* Instructions sticker – updated with cheat hint */
         .instructions {
             position: absolute;
             bottom: 20px;
@@ -260,6 +260,10 @@
             border-radius: 20px;
             border: 2px solid #3a6ea5;
             z-index: 25;
+            line-height: 1.8;
+        }
+        .instructions span {
+            color: #ffb347;
         }
     </style>
 </head>
@@ -288,9 +292,10 @@
         <span>🔫 <span id="score">0</span></span>
     </div>
 
-    <!-- Instructions sticker -->
+    <!-- Instructions sticker – now includes left‑click cheat hint -->
     <div class="instructions">
-        ← → ↑ ↓  |  SPACE
+        ← → ↑ ↓  |  SPACE<br>
+        <span>🖱️ LEFT CLICK = CHEATS</span>
     </div>
 
     <!-- Game Over modal -->
@@ -300,9 +305,10 @@
         <button onclick="window.location.href='menu.html'">MENU</button>
     </div>
 
-    <!-- Scripts (unchanged) -->
+    <!-- Scripts – cheats.js added -->
     <script src="assets.js"></script>
     <script src="enemies.js"></script>
     <script src="game.js"></script>
+    <script src="cheats.js"></script>
 </body>
 </html>
