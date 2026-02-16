@@ -1,5 +1,4 @@
 // ==================== ASSETS.JS ====================
-// Global asset storage
 const assets = {
     images: {},
     sounds: {},
@@ -9,7 +8,6 @@ const assets = {
     loadedCount: 0
 };
 
-// List of assets to load – UPDATE PATHS TO YOUR FILES
 const assetManifest = {
     images: [
         { name: 'player', src: 'images/player.png' },
@@ -18,7 +16,7 @@ const assetManifest = {
         { name: 'bullet', src: 'images/bullet.png' },
         { name: 'enemyBullet', src: 'images/bullet.png' },
         { name: 'explosion', src: 'images/explosion.png' },
-        { name: 'starfield', src: 'images/starfield.png' } // optional
+        { name: 'starfield', src: 'images/starfield.png' }
     ],
     sounds: [
         { name: 'laser', src: 'sounds/Laser 3.mp3' },
@@ -26,39 +24,43 @@ const assetManifest = {
         { name: 'bgm', src: 'sounds/universfield-horror-background-atmosphere-156462.mp3' }
     ],
     videos: [
-        { name: 'nebula', src: 'videos/139106-771366016_small.mp4' } // optional background
+        { name: 'nebula', src: 'sounds/139106-771366016_small.mp4' }
     ]
 };
 
-// Load all assets
 function loadAssets(callback) {
     assets.totalAssets = assetManifest.images.length + assetManifest.sounds.length + assetManifest.videos.length;
 
-    // Images
+    // Images (with error fallback)
     assetManifest.images.forEach(item => {
         const img = new Image();
         img.src = item.src;
         img.onload = assetLoaded;
+        img.onerror = () => {
+            console.warn(`Failed to load image: ${item.src}`);
+            assetLoaded(); // still count it so game continues
+        };
         assets.images[item.name] = img;
     });
 
-    // Sounds (Audio elements)
+    // Sounds
     assetManifest.sounds.forEach(item => {
         const audio = new Audio();
         audio.src = item.src;
         audio.load();
-        // We don't wait for canplaythrough – just assume it's okay
+        audio.onerror = () => console.warn(`Failed to load sound: ${item.src}`);
         assets.sounds[item.name] = audio;
-        assetLoaded(); // count as loaded immediately (or you can wait for canplaythrough)
+        assetLoaded();
     });
 
-    // Videos (HTML5 video elements)
+    // Videos
     assetManifest.videos.forEach(item => {
         const video = document.createElement('video');
         video.src = item.src;
         video.loop = true;
-        video.muted = true; // usually muted for background
+        video.muted = true;
         video.load();
+        video.onerror = () => console.warn(`Failed to load video: ${item.src}`);
         assets.videos[item.name] = video;
         assetLoaded();
     });
@@ -72,27 +74,23 @@ function loadAssets(callback) {
     }
 }
 
-// Play a sound (with volume from localStorage)
+// Play sound with safe volume default
 function playSound(name, volume = 1.0) {
     if (!assets.sounds[name]) return;
-    // Clone to allow overlapping
     const sound = assets.sounds[name].cloneNode();
-    sound.volume = (localStorage.getItem('spaceShooters_volume') / 100) * volume;
-    sound.play().catch(e => {}); // ignore autoplay errors – we'll call after user gesture
+    let volSetting = localStorage.getItem('spaceShooters_volume');
+    if (volSetting === null) volSetting = 70;          // default 70%
+    sound.volume = (volSetting / 100) * volume;
+    sound.play().catch(e => {}); // ignore autoplay blockers
 }
 
-// Initialize audio context on first click (to unlock audio)
+// Unlock audio on first user gesture
 function enableAudioOnUserGesture() {
-    const unlockAudio = () => {
-        // Play a silent sound to unlock Web Audio (if we were using Web Audio API)
-        // But we're using simple Audio elements – they are already "unlocked" by user interaction.
-        // We'll just remove the listener.
-        document.removeEventListener('click', unlockAudio);
-        document.removeEventListener('keydown', unlockAudio);
+    const unlock = () => {
+        document.removeEventListener('click', unlock);
+        document.removeEventListener('keydown', unlock);
     };
-    document.addEventListener('click', unlockAudio);
-    document.addEventListener('keydown', unlockAudio);
+    document.addEventListener('click', unlock);
+    document.addEventListener('keydown', unlock);
 }
-
-// Call this at the beginning of game.js
 enableAudioOnUserGesture();
